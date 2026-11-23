@@ -81,6 +81,7 @@ class EngineTest(unittest.TestCase):
                 settle_every_seconds=10 ** 12,
                 mark_every_seconds=10 ** 12,
                 min_shares=1.0,
+                fee_rate=0.01,
             ),
             targets={
                 "t": TargetConfig(
