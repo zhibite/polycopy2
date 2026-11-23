@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}PolyCopy{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+{% block head %}{% endblock %}
+</head>
+<body>
+<nav>
+  <span class="brand">PolyCopy</span>
+  <a href="/" class="{{ 'active' if page == 'dashboard' else '' }}">控制台</a>
+  <a href="/trades" class="{{ 'active' if page == 'trades' else '' }}">交易记录</a>
+  <a href="/positions" class="{{ 'active' if page == 'positions' else '' }}">持仓</a>
+  <a href="/signals" class="{{ 'active' if page == 'signals' else '' }}">跟单信号</a>
+  <a href="/config" class="{{ 'active' if page == 'config' else '' }}">策略配置</a>
+  <div class="nav-right">
+    <span class="live-dot {{ '' if bot_online else 'offline' }}"></span>
+    <span>{{ '引擎在线' if bot_online else '引擎离线' }}</span>
+    <span id="clock" class="mono">{{ now_bj }}</span>
+    <span class="nav-user">{{ username }}</span>
+    <form method="post" action="/logout" class="logout-form">
+      <button type="submit" class="link-btn">退出</button>
+    </form>
+  </div>
+</nav>
+
+<div class="container">
+{% block content %}{% endblock %}
+</div>
+
+<footer>
+  PolyCopy · 纸盘跟单 · 时间为北京时间 (UTC+8)
+  {% if bot_heartbeat %} · 引擎心跳 {{ bot_heartbeat|dt_bj }}{% endif %}
+</footer>
+
+<script>
+(function () {
+  var el = document.getElementById('clock');
+  if (!el) return;
+  function tick() {
+    var d = new Date(Date.now() + 8 * 3600 * 1000);
+    el.textContent = d.toISOString().slice(0, 19).replace('T', ' ');
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>

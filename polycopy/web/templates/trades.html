@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}交易记录 - PolyCopy{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>交易记录</h1>
+    <div class="page-sub">纸盘跟单的实际成交记录 · 时间为北京时间</div>
+  </div>
+  <div class="head-meta">
+    共 <b>{{ data.total }}</b> 笔成交<br>
+    每页 {{ data.per_page }} 条
+  </div>
+</div>
+
+<form class="filters" method="get" action="/trades">
+  <label>方向
+    <select name="side">
+      <option value="" {{ 'selected' if filters.side == '' else '' }}>全部</option>
+      <option value="BUY" {{ 'selected' if filters.side == 'BUY' else '' }}>买入</option>
+      <option value="SELL" {{ 'selected' if filters.side == 'SELL' else '' }}>卖出</option>
+    </select>
+  </label>
+  <label>目标钱包
+    <select name="target">
+      <option value="">全部</option>
+      {% for name, t in (cfg.targets.items() if cfg else []) %}
+        <option value="{{ t.address }}" {{ 'selected' if filters.target == t.address else '' }}>
+          {{ name }} · {{ t.address|short_addr }}
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>开始日期
+    <input type="date" name="start" value="{{ filters.start }}">
+  </label>
+  <label>结束日期
+    <input type="date" name="end" value="{{ filters.end }}">
+  </label>
+  <button class="btn btn-primary btn-sm" type="submit">查询</button>
+  <a class="btn btn-ghost btn-sm" href="/trades" style="text-decoration:none;display:inline-block;padding:6px 12px;border-radius:7px">重置</a>
+</form>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">成交笔数</div>
+    <div class="stat-value">{{ data.total }}</div>
+    <div class="stat-sub">筛选范围内</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">买入金额</div>
+    <div class="stat-value">{{ data.sums.buy_notional|money }}</div>
+    <div class="stat-sub">含手续费以外的名义金额</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">卖出金额</div>
+    <div class="stat-value">{{ data.sums.sell_notional|money }}</div>
+    <div class="stat-sub">含手续费以外的名义金额</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">手续费</div>
+    <div class="stat-value">{{ data.sums.fee|money }}</div>
+    <div class="stat-sub">已实现盈亏 {{ data.sums.realized|signed_money }}</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>成交明细 <span class="count">{{ data.rows|length }}</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>时间</th><th>方向</th><th>市场</th><th>结果</th>
+          <th>价格</th><th>数量</th><th>金额</th><th>手续费</th><th>已实现盈亏</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in data.rows %}
+          <tr>
+            <td class="mono">{{ f.ts|dt_bj }}</td>
+            <td><span class="pill {{ 'buy' if f.side == 'BUY' else 'sell' }}">{{ '买入' if f.side == 'BUY' else '卖出' }}</span></td>
+            <td title="{{ f.title }}">{{ (f.title or f.condition_id)|short_title(58) }}</td>
+            <td>{{ f.outcome or '--' }}</td>
+            <td class="mono">{{ f.price|price }}</td>
+            <td class="mono">{{ f.shares|num(2) }}</td>
+            <td class="mono">{{ f.notional|money }}</td>
+            <td class="mono muted">{{ f.fee|num(4) }}</td>
+            <td class="mono {{ 'green' if (f.realized_pnl or 0) >= 0 else 'red' }}">
+              {{ (f.realized_pnl|signed_money) if f.side == 'SELL' else '--' }}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9" class="no-data">暂无符合条件的成交</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% set pages = (((data.total - 1) // data.per_page) + 1) if data.total > 0 else 1 %}
+  {% set qs = 'side=' ~ filters.side ~ '&target=' ~ filters.target ~ '&start=' ~ filters.start ~ '&end=' ~ filters.end %}
+  <div class="pager">
+    {% if data.page > 1 %}
+      <a href="/trades?{{ qs }}&page={{ data.page - 1 }}">上一页</a>
+    {% else %}
+      <span class="disabled">上一页</span>
+    {% endif %}
+    <span class="pager-info">第 {{ data.page }} / {{ pages }} 页 · 共 {{ data.total }} 笔</span>
+    {% if data.page < pages %}
+      <a href="/trades?{{ qs }}&page={{ data.page + 1 }}">下一页</a>
+    {% else %}
+      <span class="disabled">下一页</span>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

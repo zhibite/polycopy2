@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}策略配置 - PolyCopy{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>策略配置</h1>
+    <div class="page-sub">保存后引擎会在下一次轮询时自动热加载，无需重启</div>
+  </div>
+  <div class="head-meta">
+    配置文件：<span class="mono">{{ config_path }}</span><br>
+    数据库：<span class="mono">{{ db_path }}</span>
+  </div>
+</div>
+
+{% if saved %}
+  <div class="alert ok">配置已保存。引擎将在约 {{ cfg.paper.poll_seconds }} 秒内自动生效。</div>
+{% endif %}
+{% if error %}
+  <div class="alert warn">保存失败：{{ error }}</div>
+{% endif %}
+
+<div class="alert info">
+  这里只调整跟单策略参数。数据库路径、日志路径、目标钱包地址不在此页修改。
+  带 <b>热加载</b> 的字段保存后由引擎自动读取；账户初始资金只在建库时生效，之后不可更改。
+</div>
+
+<form method="post" action="/config">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <div class="config-group">
+    <h2><span class="dot"></span>账户与目标钱包</h2>
+    <div class="config-grid">
+      <div class="field">
+        <label>账户初始资金</label>
+        <input type="text" value="{{ cfg.account.starting_cash|money }}" readonly>
+        <div class="help">建库时写入，修改不会影响现有账户。</div>
+      </div>
+      <div class="field">
+        <label>目标钱包地址</label>
+        <input type="text" value="{{ target.address }}" readonly>
+        <div class="help">如需更换目标，请直接编辑配置文件后重新部署。</div>
+      </div>
+      <div class="field">
+        <label>启用该目标</label>
+        <div class="switch-row">
+          <input type="checkbox" name="target.enabled" value="1" {{ 'checked' if target.enabled else '' }}>
+          <span class="key">target.enabled</span>
+        </div>
+        <div class="help">关闭后不再轮询该钱包。</div>
+      </div>
+      <div class="field">
+        <label>仓位模式</label>
+        <select name="target.sizing_mode">
+          <option value="scale" {{ 'selected' if target.sizing_mode == 'scale' else '' }}>按目标成交额比例</option>
+          <option value="fixed" {{ 'selected' if target.sizing_mode == 'fixed' else '' }}>每笔固定金额</option>
+        </select>
+        <div class="help">scale：我们的金额 = 目标金额 × 跟单比例；fixed：每笔固定金额。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="config-group">
+    <h2><span class="dot"></span>买入过滤与仓位</h2>
+    <div class="config-grid">
+      <div class="field">
+        <label>跟单比例（scale 模式）</label>
+        <input type="number" step="0.0001" min="0.00001" max="1"
+               name="target.scale_factor" value="{{ target.scale_factor }}">
+        <div class="help">例如 0.02 表示目标买入 $100 时我们买入 $2。</div>
+      </div>
+      <div class="field">
+        <label>固定金额（fixed 模式，USD）</label>
+        <input type="number" step="0.01" min="0" name="target.fixed_notional_usd"
+               value="{{ target.fixed_notional_usd }}">
+      </div>
+      <div class="field">
+        <label>单笔最小金额（USD）</label>
+        <input type="number" step="0.01" min="0" name="target.min_notional_usd"
+               value="{{ target.min_notional_usd }}">
+      </div>
+      <div class="field">
+        <label>单笔最大金额（USD）</label>
+        <input type="number" step="0.01" min="0" name="target.max_notional_usd"
+               value="{{ target.max_notional_usd }}">
+      </div>
+      <div class="field">
+        <label>最低买入价（0–1）</label>
+        <input type="number" step="0.001" min="0" max="1" name="target.buy_price_min"
+               value="{{ target.buy_price_min }}">
+        <div class="help">只跟这个价格区间内的主动买入。</div>
+      </div>
+      <div class="field">
+        <label>最高买入价（0–1）</label>
+        <input type="number" step="0.001" min="0" max="1" name="target.buy_price_max"
+               value="{{ target.buy_price_max }}">
+      </div>
+      <div class="field">
+        <label>目标最小成交额（USD）</label>
+        <input type="number" step="1" min="0" name="target.min_target_usd"
+               value="{{ target.min_target_usd }}">
+        <div class="help">过滤目标钱包的小额碎单。</div>
+      </div>
+      <div class="field">
+        <label>目标最大成交额（USD）</label>
+        <input type="number" step="1" min="0" name="target.max_target_usd"
+               value="{{ target.max_target_usd }}">
+      </div>
+      <div class="field">
+        <label>单市场最大敞口（USD）</label>
+        <input type="number" step="1" min="0" name="target.max_market_usd"
+               value="{{ target.max_market_usd }}">
+        <div class="help">同一 condition_id 下所有持仓的成本上限。</div>
+      </div>
+      <div class="field">
+        <label>最大同时持仓数</label>
+        <input type="number" step="1" min="1" max="10000" name="target.max_open_positions"
+               value="{{ target.max_open_positions }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="config-group">
+    <h2><span class="dot"></span>跟卖与过滤</h2>
+    <div class="config-grid">
+      <div class="field">
+        <label>跟随目标卖出</label>
+        <div class="switch-row">
+          <input type="checkbox" name="target.copy_sells" value="1" {{ 'checked' if target.copy_sells else '' }}>
+          <span class="key">target.copy_sells</span>
+        </div>
+        <div class="help">按目标卖出占其仓位的比例，卖出我们同比例的份额。</div>
+      </div>
+      <div class="field">
+        <label>首次回溯秒数</label>
+        <input type="number" step="1" min="0" max="86400" name="target.initial_lookback_seconds"
+               value="{{ target.initial_lookback_seconds }}">
+        <div class="help">仅首次启动时回溯最近 N 秒的成交。</div>
+      </div>
+      <div class="field">
+        <label>目标手续费率覆盖（留空继承全局）</label>
+        <input type="number" step="0.001" min="0" max="0.5" name="target.fee_rate"
+               value="{{ target.fee_rate if target.fee_rate is not none else '' }}"
+               placeholder="继承 paper.fee_rate">
+        <div class="help">BTC 5m/15m 类市场为 0.05，一般加密市场为 0.01。</div>
+      </div>
+      <div class="field">
+        <label>排除事件关键词（逗号分隔）</label>
+        <input type="text" name="target.exclude_event_substrings"
+               value="{{ target.exclude_event_substrings|join(', ') }}"
+               placeholder="-updown-">
+        <div class="help">event_slug 包含任一关键词时跳过。</div>
+      </div>
+      <div class="field">
+        <label>排除市场关键词（逗号分隔）</label>
+        <input type="text" name="target.exclude_slug_substrings"
+               value="{{ target.exclude_slug_substrings|join(', ') }}">
+        <div class="help">market slug 包含任一关键词时跳过。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="config-group">
+    <h2><span class="dot"></span>轮询与成交模拟</h2>
+    <div class="config-grid">
+      <div class="field">
+        <label>轮询间隔（秒）</label>
+        <input type="number" step="1" min="5" max="3600" name="paper.poll_seconds"
+               value="{{ cfg.paper.poll_seconds }}">
+      </div>
+      <div class="field">
+        <label>回溯重叠窗口（秒）</label>
+        <input type="number" step="1" min="0" max="86400" name="paper.overlap_seconds"
+               value="{{ cfg.paper.overlap_seconds }}">
+        <div class="help">每次轮询向前多取一段，靠去重避免重复跟进。</div>
+      </div>
+      <div class="field">
+        <label>信号有效期（秒）</label>
+        <input type="number" step="1" min="0" max="604800" name="paper.stale_signal_seconds"
+               value="{{ cfg.paper.stale_signal_seconds }}">
+        <div class="help">超过这个时间的成交信号不再跟单。</div>
+      </div>
+      <div class="field">
+        <label>全局手续费率</label>
+        <input type="number" step="0.001" min="0" max="0.5" name="paper.fee_rate"
+               value="{{ cfg.paper.fee_rate }}">
+        <div class="help">手续费 = 份额 × 费率 × 价格 × (1 − 价格)。</div>
+      </div>
+      <div class="field">
+        <label>买入滑点上限（价格）</label>
+        <input type="number" step="0.001" min="0" max="0.5" name="paper.max_buy_drift"
+               value="{{ cfg.paper.max_buy_drift }}">
+        <div class="help">成交 VWAP 高于信号价超过该值就放弃。</div>
+      </div>
+      <div class="field">
+        <label>卖出滑点上限（价格）</label>
+        <input type="number" step="0.001" min="0" max="0.5" name="paper.max_sell_drift"
+               value="{{ cfg.paper.max_sell_drift }}">
+      </div>
+      <div class="field">
+        <label>最低成交比例</label>
+        <input type="number" step="0.01" min="0" max="1" name="paper.min_fill_ratio"
+               value="{{ cfg.paper.min_fill_ratio }}">
+        <div class="help">盘口只能吃到部分数量时，低于该比例就整笔放弃。</div>
+      </div>
+      <div class="field">
+        <label>现金保留比例</label>
+        <input type="number" step="0.01" min="0" max="0.9" name="paper.cash_reserve_pct"
+               value="{{ cfg.paper.cash_reserve_pct }}">
+      </div>
+      <div class="field">
+        <label>结算检查间隔（秒）</label>
+        <input type="number" step="1" min="30" max="86400" name="paper.settle_every_seconds"
+               value="{{ cfg.paper.settle_every_seconds }}">
+      </div>
+      <div class="field">
+        <label>标记价格间隔（秒）</label>
+        <input type="number" step="1" min="30" max="86400" name="paper.mark_every_seconds"
+               value="{{ cfg.paper.mark_every_seconds }}">
+      </div>
+      <div class="field">
+        <label>活动接口最大分页数</label>
+        <input type="number" step="1" min="1" max="50" name="paper.max_pages"
+               value="{{ cfg.paper.max_pages }}">
+      </div>
+      <div class="field">
+        <label>活动接口每页条数</label>
+        <input type="number" step="1" min="50" max="1000" name="paper.page_limit"
+               value="{{ cfg.paper.page_limit }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <span class="save-msg">保存后约 {{ cfg.paper.poll_seconds }} 秒内生效 · 修改前会自动备份为 .bak</span>
+    <a href="/config" class="btn btn-ghost" style="text-decoration:none;display:inline-block;padding:9px 16px;border-radius:7px">放弃修改</a>
+    <button class="btn btn-primary" type="submit">保存配置</button>
+  </div>
+</form>
+
+{% endblock %}

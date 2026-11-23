@@ -1,0 +1,25 @@
+services:
+  polycopy-web:
+    build: .
+    container_name: polycopy-web
+    restart: unless-stopped
+    ports:
+      - "8040:8040"
+    environment:
+      WEB_PORT: "8040"
+      WEB_USERNAME: "${WEB_USERNAME:-admin}"
+      WEB_PASSWORD: "${WEB_PASSWORD:-}"
+      WEB_SESSION_TTL_S: "${WEB_SESSION_TTL_S:-604800}"
+      POLY_PROJECT_DIR: /app/project
+      POLY_DB_PATH: /app/project/data/paper_f705.db
+      POLY_CONFIG_PATH: /app/project/configs/paper_f705.toml
+    volumes:
+      # The paper bot runs on the host and writes this SQLite DB. Mount the
+      # project dir read-write so the dashboard can also edit the TOML config.
+      - /root/polycopy:/app/project
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8040/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

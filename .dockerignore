@@ -1,0 +1,17 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+data/
+probe_*/
+reports/
+tests/
+scripts/
+docs/
+*.db
+*.db-wal
+*.db-shm
+*.log
+.env

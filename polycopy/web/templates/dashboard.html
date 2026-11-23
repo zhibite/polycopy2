@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}控制台 - PolyCopy{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="30">{% endblock %}
+{% block content %}
+
+{% set first_target = (cfg.targets.values()|list|first) if cfg and cfg.targets else None %}
+
+<div class="page-head">
+  <div>
+    <h1>控制台</h1>
+    <div class="page-sub">
+      {% if first_target %}
+        跟单 {{ first_target.address|short_addr }} · 买入价
+        {{ '%.2f'|format(first_target.buy_price_min) }}–{{ '%.2f'|format(first_target.buy_price_max) }}
+      {% else %}
+        纸盘跟单总览
+      {% endif %}
+    </div>
+  </div>
+  <div class="head-meta">
+    账户：<b>纸盘</b><br>
+    数据刷新：30 秒
+  </div>
+</div>
+
+{% if not summary.bot_online %}
+  <div class="alert warn">
+    纸盘引擎心跳已停止（最后心跳：{{ summary.bot_heartbeat|dt_bj }}）。
+    请检查服务器上的 <code>python3 -m polycopy run</code> 进程是否在运行。
+  </div>
+{% endif %}
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">总权益</div>
+    <div class="stat-value">{{ summary.equity|money }}</div>
+    <div class="stat-sub">现金 {{ summary.cash|money }} · 持仓 {{ summary.market_value|money }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">累计盈亏</div>
+    <div class="stat-value {{ 'green' if summary.total_pnl >= 0 else 'red' }}">
+      {{ summary.total_pnl|signed_money }}
+    </div>
+    <div class="stat-sub">
+      初始资金 {{ summary.starting_cash|money }}
+      {% if summary.total_return is not none %} · {{ summary.total_return|pct }}
+      {% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">今日已实现盈亏</div>
+    <div class="stat-value {{ 'green' if summary.today_realized >= 0 else 'red' }}">
+      {{ summary.today_realized|signed_money }}
+    </div>
+    <div class="stat-sub">今日成交 {{ summary.today_fills }} 笔 · 北京时间</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">当前持仓</div>
+    <div class="stat-value purple">{{ summary.open_positions }}</div>
+    <div class="stat-sub">成本 {{ summary.cost|money }} · 浮动 {{ summary.unrealized|signed_money }}</div>
+  </div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">跟单信号</div>
+    <div class="stat-value">{{ summary.signals_total }}</div>
+    <div class="stat-sub">
+      已跟单 {{ summary.signals_copied }}
+      {% if summary.copy_rate is not none %} · {{ summary.copy_rate|pct }}{% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">已平仓胜率</div>
+    <div class="stat-value {{ 'green' if (summary.win_rate or 0) >= 0.5 else 'orange' }}">
+      {{ summary.win_rate|pct if summary.win_rate is not none else '--' }}
+    </div>
+    <div class="stat-sub">
+      {{ summary.wins }} 胜 / {{ summary.losses }} 负 · 共 {{ summary.closed_positions }} 个仓位
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">手续费</div>
+    <div class="stat-value">{{ summary.fees_paid|money }}</div>
+    <div class="stat-sub">已实现（含结算）{{ summary.realized|signed_money }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">目标最近成交</div>
+    <div class="stat-value" style="font-size:19px">{{ summary.last_target_fill|dt_bj }}</div>
+    <div class="stat-sub">引擎心跳 {{ summary.bot_heartbeat|dt_bj }}</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>当前持仓 <span class="count">{{ positions|length }}</span>
+    <a class="more" href="/positions">全部持仓 →</a></h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>市场</th><th>结果</th><th>数量</th><th>均价</th><th>标记价</th><th>浮动盈亏</th><th>更新时间</th></tr>
+      </thead>
+      <tbody>
+        {% for p in positions %}
+          {% set mark = p.mark_mid if p.mark_mid is not none else p.avg_cost %}
+          {% set upnl = p.shares * (mark - p.avg_cost) %}
+          <tr>
+            <td title="{{ p.title }}">{{ p.title|short_title(62) }}</td>
+            <td><span class="pill {{ 'buy' if (p.outcome or '')|lower in ['yes','up'] else 'sell' }}">{{ p.outcome or '--' }}</span></td>
+            <td class="mono">{{ p.shares|num(2) }}</td>
+            <td class="mono">{{ p.avg_cost|price }}</td>
+            <td class="mono">{{ mark|price }}</td>
+            <td class="mono {{ 'green' if upnl >= 0 else 'red' }}">{{ upnl|signed_money }}</td>
+            <td class="mono muted">{{ p.updated_at|dt_bj }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="no-data">暂无持仓</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <h2>最近交易 <span class="count">{{ fills|length }}</span>
+    <a class="more" href="/trades">全部交易 →</a></h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>时间</th><th>方向</th><th>市场</th><th>结果</th><th>价格</th><th>数量</th><th>金额</th><th>手续费</th><th>已实现</th></tr>
+      </thead>
+      <tbody>
+        {% for f in fills %}
+          <tr>
+            <td class="mono">{{ f.ts|dt_bj }}</td>
+            <td><span class="pill {{ 'buy' if f.side == 'BUY' else 'sell' }}">{{ '买入' if f.side == 'BUY' else '卖出' }}</span></td>
+            <td title="{{ f.title }}">{{ (f.title or f.condition_id)|short_title(52) }}</td>
+            <td>{{ f.outcome or '--' }}</td>
+            <td class="mono">{{ f.price|price }}</td>
+            <td class="mono">{{ f.shares|num(2) }}</td>
+            <td class="mono">{{ f.notional|money }}</td>
+            <td class="mono muted">{{ f.fee|num(4) }}</td>
+            <td class="mono {{ 'green' if (f.realized_pnl or 0) >= 0 else 'red' }}">
+              {{ (f.realized_pnl|signed_money) if f.side == 'SELL' else '--' }}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9" class="no-data">暂无成交（目标钱包出现符合条件的新交易后会自动跟单）</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="section">
+    <h2>信号跳过原因 <a class="more" href="/signals">全部信号 →</a></h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>结果</th><th>笔数</th><th>金额</th></tr></thead>
+        <tbody>
+          {% for r in skips %}
+            <tr>
+              <td>
+                {% if r.copied %}
+                  <span class="pill ok">已跟单</span>
+                {% else %}
+                  {{ r.reason|reason_cn }}
+                {% endif %}
+              </td>
+              <td class="mono">{{ r.n }}</td>
+              <td class="mono">{{ r.notional|money }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="no-data">暂无信号</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>近 14 天已实现盈亏</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>日期</th><th>已实现</th><th>笔数</th></tr></thead>
+        <tbody>
+          {% for d in daily %}
+            <tr>
+              <td class="mono">{{ d.d }}</td>
+              <td class="mono {{ 'green' if (d.pnl or 0) >= 0 else 'red' }}">{{ d.pnl|signed_money }}</td>
+              <td class="mono muted">{{ d.n }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="no-data">暂无已实现盈亏</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>目标钱包</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>钱包</th><th>地址</th><th>已抓取成交</th><th>最近成交</th><th>过滤条件</th></tr></thead>
+      <tbody>
+        {% for name, t in (cfg.targets.items() if cfg else []) %}
+          {% set row = (targets|selectattr('target', 'equalto', t.address)|list|first) if targets else None %}
+          <tr>
+            <td>{{ name }}</td>
+            <td class="mono">
+              <a class="purple" target="_blank" rel="noopener"
+                 href="https://polymarket.com/profile/{{ t.address }}">{{ t.address|short_addr }}</a>
+            </td>
+            <td class="mono">{{ row.fills if row else 0 }}</td>
+            <td class="mono">{{ (row.last_ts|dt_bj) if row else '--' }}</td>
+            <td class="muted">
+              买入 {{ '%.2f'|format(t.buy_price_min) }}–{{ '%.2f'|format(t.buy_price_max) }} ·
+              {{ '固定 $' ~ t.fixed_notional_usd if t.sizing_mode == 'fixed' else '跟单 ' ~ (t.scale_factor * 100)|round(2) ~ '%' }}
+              · 单市场上限 {{ t.max_market_usd|money }}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="no-data">配置文件未加载</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

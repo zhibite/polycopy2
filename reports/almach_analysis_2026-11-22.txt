@@ -1,0 +1,261 @@
+====================================================================================
+POLYMARKET WALLET PROFILE   0x3725d52f3c252e8374999cc8617292ea2608ad88
+====================================================================================
+join date                     : 2026-05-21 15:20
+activity window fetched       : 2026-08-28 11:00  ..  2026-11-22 14:38  (86 days)
+last trade                    : 2026-11-22 14:38 (0.02 days ago)
+rows fetched                  : activity=400000  closed_pos=163294  open=418 redeemable=410 mergeable=4
+activity truncated            : {'activity': True, 'positions_open': False, 'positions_redeemable': False, 'positions_mergeable': False, 'positions_closed': False}
+
+--- ALL-TIME ACCOUNT -------------------------------------------------------------
+  volume (gross)              : $32.34M   one-side USDC $16.25M
+  trade count (stats/volume)  : 111075 / 728544
+  realized market PnL         : $460.6K
+  unrealized PnL (now)        : $604
+  maker rebate                : $61.9K
+  taker rebate                : $8.1K
+  reward income               : $4.8K
+  fees paid                   : $-53.5K
+  economic PnL (all-in)       : $535.9K
+  biggest single win          : $2.6K
+  economic PnL / volume       : 1.657%
+  leaderboard day            : rank_pnl 247  rank_volume 180  name almach
+  leaderboard week           : rank_pnl 265  rank_volume 128  name almach
+  leaderboard month          : rank_pnl 335  rank_volume 238  name almach
+  leaderboard all            : rank_pnl 463  rank_volume 877  name almach
+
+--- PnL CURVE (daily, cumulative) -----------------------------------------------
+  first / last point          : 2026-05-23 00:00 $366  ..  2026-11-22 13:00 $535.6K
+  peak / max drawdown         : $535.6K / $-8.5K
+  monthly economic PnL / volume / trades:
+    2026-05  pnl      $1.6K   volume     $1.01M   trades 24027
+    2026-06  pnl     $34.2K   volume     $4.61M   trades 113527
+    2026-07  pnl    $107.2K   volume    $10.02M   trades 268160
+    2026-08  pnl    $123.3K   volume    $15.64M   trades 418754
+    2026-09  pnl    $106.9K   volume    $21.35M   trades 542935
+    2026-10  pnl     $78.2K   volume    $26.40M   trades 628938
+    2026-11  pnl     $84.3K   volume    $32.33M   trades 728389
+  last 7d economic PnL      : $27.7K
+  last 30d economic PnL      : $104.7K
+  last 90d economic PnL      : $291.8K
+
+--- ACTIVITY MIX ------------------------------------------------------------------
+  TRADE          326659 rows         $8.61M
+  REDEEM          59038 rows         $5.37M
+  MERGE           14120 rows         $3.48M
+  MAKER_REBATE       86 rows         $31.8K
+  TAKER_REBATE       85 rows          $5.7K
+  REWARD             12 rows          $1.7K
+  TRADE sides                 : BUY 326659 / SELL 0   <-- never sells
+
+--- EXIT MECHANISM ---------------------------------------------------------------
+  MERGE                       : 14120 rows, 3,480,045 pairs -> $3.48M (avg $1.00/share)
+  REDEEM                      : 59038 rows -> $5.37M   winning 32156 ($5.37M sh), worthless 26882 ($4.96M sh)
+  exit mix by USD             : merge 39.3% / redeem 60.7%
+  buy USD vs exits (this window): buys $8.61M  exits $8.85M  gross PnL $237.6K
+
+--- MARKET-MAKING SIGNATURE ------------------------------------------------------
+  distinct conditions         : 47557
+  fills per condition         : median 3  p90 17  max 139
+  bought BOTH outcomes        : 23054 (48.5%)
+  combined pair cost (VWAP)   : p10 0.6102  p25 0.7963  median 0.9906  p75 1.1891  p90 1.3877
+  volume-weighted pair cost   : 0.9858  (edge 1.424% of notional at merge)
+    pair cost < 0.95           : 44.0%
+    pair cost < 0.98           : 48.2%
+    pair cost < 0.99           : 49.8%
+    pair cost < 1.0            : 51.1%
+    pair cost < 1.01           : 52.7%
+  pairs available / merged    : 5,271,912 / 3,479,753 (66.0%)
+  activity-window est. PnL    : $236.9K  on $8.61M bought  (2.750%)
+  per-market est. PnL         : median $1.18  p10 $-72  p90 $90  min $-2.6K  max $2.6K
+  profitable markets          : 54.6%
+  est. PnL by combined pair cost bucket:
+    <0.95     n= 10148  PnL    $684.8K  avg $67/market
+    0.95-0.98 n=   973  PnL     $12.5K  avg $13/market
+    0.98-1.00 n=   669  PnL      $4.6K  avg $6.83/market
+    1.00-1.02 n=   701  PnL       $589  avg $0.84/market
+    >1.02     n= 10563  PnL   $-565.1K  avg $-53/market
+  first buy -> first merge    : median 0.2m  p25 -0.7m  p75 1.2m  p90 6.5m
+  market end -> redeem        : median 1.4m  p90 1.6m
+
+--- FILL FREQUENCY & SIZE -------------------------------------------------------
+  active days                 : 87 / 86 calendar days (101.0%)
+  fills per active day        : median 3,866  p90 5,212  max 7173
+  avg fills/day overall       : 3791.7
+  busiest days                : 2026-08-29 (7173), 2026-11-14 (7048), 2026-11-15 (6281), 2026-10-03 (6234), 2026-11-21 (5801)
+  fill notional              : p10 $     0.31 p25 $     1.48 p50 $     5.86 p75 $    23.31 p90 $    68.00 p99 $   310.00 max $ 2,289.38
+  fill shares                : p10      2.00 p25      5.11 p50     15.91 p75     51.62 p90    147.06 p99    500.00 max  3,353.86
+    <$10        196925 ( 60.3%)   volume $571.8K
+    $10-50       86395 ( 26.4%)   volume $2.07M
+    $50-100      22658 (  6.9%)   volume $1.61M
+    $100-500     20307 (  6.2%)   volume $4.08M
+    $500-1K        356 (  0.1%)   volume $248.7K
+    $1K-5K          18 (  0.0%)   volume $23.8K
+    >$5K             0 (  0.0%)   volume $0.00
+  most repeated fill notional : $2 x27119, $3 x20645, $4 x17889, $1 x17455, $5 x11767, $6 x10023
+
+--- BUY PRICE LEVELS --------------------------------------------------------------
+    0-5c          24170     $32.9K (  0.4%) 
+    5-15c         40265    $159.9K (  1.9%) ##
+    15-30c        51069    $477.4K (  5.5%) ######
+    30-50c        64336     $1.27M ( 14.8%) #################
+    50-70c        60287     $2.03M ( 23.6%) ###########################
+    70-85c        50168     $2.11M ( 24.5%) ############################
+    85-95c        27220     $1.61M ( 18.7%) #####################
+    95-100c        9144    $922.5K ( 10.7%) ############
+  share-weighted avg buy px   : 0.4971
+
+--- WHEN THEY QUOTE (UTC) ---------------------------------------------------------
+  00:00   13855 ###########################################
+  01:00   13417 #########################################
+  02:00   12149 ######################################
+  03:00   11343 ###################################
+  04:00   11157 ##################################
+  05:00   11594 ####################################
+  06:00   11812 ####################################
+  07:00   12074 #####################################
+  08:00   12092 #####################################
+  09:00   12063 #####################################
+  10:00   11332 ###################################
+  11:00   12999 ########################################
+  12:00   15207 ###############################################
+  13:00   16612 ###################################################
+  14:00   18128 ########################################################
+  15:00   17224 #####################################################
+  16:00   13208 #########################################
+  17:00   13058 ########################################
+  18:00   12663 #######################################
+  19:00   12985 ########################################
+  20:00   15704 #################################################
+  21:00   16035 ##################################################
+  22:00   15639 ################################################
+  23:00   14309 ############################################
+  weekday: Mon 41301  Tue 44244  Wed 40905  Thu 43198  Fri 48880  Sat 58897  Sun 49234
+
+--- TIME FROM BUY FILL TO MARKET END -------------------------------------------
+  5m   n= 225161  median 2.6m  p10 0.8m  p90 4.7m
+       <30s 5%  30-60s 12%  1-2m 22%  2-4m 38%  4-10m 24%  10-60m 0%  >60m 0%
+  15m  n=  65729  median 6.0m  p10 1.1m  p90 14.0m
+       <30s 2%  30-60s 6%  1-2m 11%  2-4m 15%  4-10m 34%  10-60m 30%  >60m 0%
+  4h   n=   6426  median 117.3m  p10 22.2m  p90 214.2m
+       <30s 1%  30-60s 0%  1-2m 1%  2-4m 1%  4-10m 3%  10-60m 23%  >60m 72%
+  1h   n=    600  median 31.5m  p10 5.9m  p90 58.6m
+       <30s 1%  30-60s 1%  1-2m 2%  2-4m 3%  4-10m 7%  10-60m 86%  >60m 0%
+  1d   n=    207  median 575.7m  p10 100.6m  p90 1,127.1m
+       <30s 0%  30-60s 0%  1-2m 0%  2-4m 0%  4-10m 1%  10-60m 3%  >60m 96%
+
+--- MARKET MIX -------------------------------------------------------------------
+  BTC up/down 5m                   fills   199032  volume     $5.36M (62.2%)
+  BTC up/down 15m                  fills    57949  volume     $1.93M (22.4%)
+  other: bitcoin                   fills    11728  volume    $404.0K (4.7%)
+  ETH up/down 5m                   fills    13173  volume    $211.3K (2.5%)
+  BTC up/down 4h                   fills     3318  volume    $170.8K (2.0%)
+  other: ethereum                  fills     7329  volume    $117.7K (1.4%)
+  SOL up/down 5m                   fills     5690  volume     $98.8K (1.1%)
+  other: solana                    fills     2648  volume     $42.7K (0.5%)
+  ETH up/down 15m                  fills     4413  volume     $38.8K (0.5%)
+  XRP up/down 5m                   fills     3481  volume     $35.6K (0.4%)
+  other: bnb                       fills     4409  volume     $34.6K (0.4%)
+  SOL up/down 15m                  fills     2090  volume     $25.5K (0.3%)
+  closed-position PnL by category:
+    BTC up/down 5m                   n=  61218  pnl    $253.3K  win 51.1%
+    BTC up/down 15m                  n=  19282  pnl     $83.0K  win 50.4%
+    other: bitcoin                   n=   5171  pnl     $24.9K  win 52.0%
+    ETH up/down 5m                   n=  12328  pnl     $24.4K  win 54.2%
+    SOL up/down 5m                   n=   9866  pnl     $15.7K  win 48.0%
+    BTC up/down 4h                   n=   1610  pnl     $12.9K  win 52.7%
+    ETH up/down 15m                  n=   7356  pnl      $6.3K  win 50.4%
+    XRP up/down 5m                   n=   3785  pnl      $5.8K  win 63.1%
+    DOGE up/down 5m                  n=   3395  pnl      $4.9K  win 59.1%
+    other: ethereum                  n=   4838  pnl      $3.4K  win 49.9%
+  distinct events             : 47528
+  top 8 events by volume:
+      0.1%     $10.7K  fills     55  btc-updown-4h-1788206400
+      0.1%      $5.3K  fills     61  btc-updown-15m-1791931500
+      0.0%      $4.3K  fills     59  btc-updown-4h-1788105600
+      0.0%      $4.1K  fills     50  btc-updown-4h-1791288000
+      0.0%      $4.0K  fills     61  btc-updown-5m-1794686100
+      0.0%      $3.8K  fills     96  btc-updown-5m-1794694500
+      0.0%      $3.8K  fills     18  btc-updown-5m-1794729600
+      0.0%      $3.7K  fills     48  btc-updown-15m-1792187100
+  top-3 / top-10 event share  : 0.2% / 0.5%
+
+--- CLOSED POSITIONS: TOKEN LEVEL -----------------------------------------------
+  closed token positions      : 163294
+  win rate (pnl>0)            : 51.5%  (84081W / 79213L)
+  total realized PnL          : $460.5K
+  avg / median win            : $52 / $18
+  avg / median loss           : $-50 / $-15
+  profit factor               : 1.12
+  ROI per token               : p25 -100.0%  median 3.4%  p75 78.6%  p90 1343.9%
+  PnL per share               : median $0.01  p10 $-0.44  p90 $0.47
+  hold hours (first->last)    : median 0.1  p25 0.1  p75 0.2  p90 0.8
+  hold buckets                : <2m 9%  2-5m 31%  5-60m 53%  1-6h 6%  6-24h 1%  1-7d 0%  >7d 0%
+  entry->market end (updown)  : median 4.1m  p10 0.9m  p90 13.8m
+  dust positions (|PnL|<$1)   : 16895 (10.3%)
+  best 5:
+         $2.6K  Down  0.188  Bitcoin Up or Down - October 28, 4:30PM-4:45PM E
+         $2.1K  Down  0.287  Bitcoin Up or Down - October 7, 10:45AM-10:50AM 
+         $1.9K  Up    0.209  Bitcoin Up or Down - September 26, 3:20AM-3:25AM
+         $1.9K  Up    0.504  Bitcoin Up or Down - October 31, 11:45AM-12:00PM
+         $1.8K  Up    0.434  Bitcoin Up or Down - November 10, 10:45AM-10:50A
+  worst 5:
+        $-2.6K  Up    0.740  Bitcoin Up or Down - November 17, 7:30PM-7:45PM 
+        $-2.4K  Up    0.778  Bitcoin Up or Down - July 21, 11:55AM-12:00PM ET
+        $-2.4K  Down  0.775  Bitcoin Up or Down - October 31, 6:15PM-6:30PM E
+        $-2.2K  Up    0.539  Bitcoin Up or Down - October 21, 11:25AM-11:30AM
+        $-2.1K  Down  0.888  Bitcoin Up or Down - July 19, 1:00PM-1:05PM ET
+
+--- CLOSED POSITIONS: MARKET LEVEL (all history) ---------------------------------
+  distinct markets            : 111123
+  markets with both outcomes  : 52171 (46.9%)
+  net PnL per market          : median $0.05  p10 $-56  p90 $73  min $-2.6K  max $2.6K
+  profitable markets          : 51.3%   total $460.5K
+  combined avg price (both)   : p10 0.5515  median 1.0000  p90 1.3842
+    combined < 0.95          : 43.8%
+    combined < 0.98          : 47.4%
+    combined < 0.99          : 48.7%
+    combined < 1.0           : 50.0%
+    combined < 1.01          : 51.4%
+  market PnL by combined price bucket:
+    <0.95     n=  22840  PnL      $1.07M  avg $47/market
+    0.95-0.98 n=   1873  PnL       $9.4K  avg $5.03/market
+    0.98-1.00 n=   1360  PnL       $4.9K  avg $3.57/market
+    1.00-1.02 n=   1539  PnL       $5.2K  avg $3.39/market
+    >1.02     n=  24559  PnL    $-972.8K  avg $-40/market
+  monthly PnL by position close month:
+    2026-05:$-3.0K  2026-06:$31.3K  2026-07:$94.5K  2026-08:$105.4K  2026-09:$95.4K  2026-10:$68.9K  2026-11:$68.0K
+
+--- OPEN BOOK -----------------------------------------------------------------------
+  open         n= 418  current      $900  cost      $868  unrealized       $32
+  redeemable   n= 410  current      $129  cost      $115  unrealized       $14
+  mergeable    n=   4  current      $228  cost      $291  unrealized      $-63
+  total unrealized PnL        : $32
+  redeemable value (unclaimed): $129   mergeable $228
+  largest open positions:
+         $523  avg 0.731 -> 0.870  Up    Bitcoin Up or Down on November 22?
+         $187  avg 0.870 -> 0.940  Up    Ethereum Up or Down on November 22?
+          $28  avg 0.380 -> 0.520  Down  Bitcoin Up or Down - November 22, 9:45AM-9
+          $18  avg 0.680 -> 0.590  Up    Ethereum Up or Down - November 22, 9:45AM-
+          $12  avg 0.487 -> 0.060  Down  Ethereum Up or Down on November 22?
+        $1.67  avg 0.680 -> 0.535  Down  Dogecoin Up or Down - November 22, 8:00AM-
+        $1.58  avg 0.435 -> 0.480  Up    Bitcoin Up or Down - November 22, 9:45AM-9
+        $1.00  avg 0.828 -> 1.000  Up    Solana Up or Down on October 25?
+
+--- MAKER / TAKER & FEES --------------------------------------------------------
+  last 24h fills              : all 4529  taker 80  maker 4449 (98.2%)
+  fees paid (all time)        : $-53.5K
+  maker + taker rebates       : $70.0K
+  rewards                     : $4.8K
+  fees / volume               : -0.165%
+  rebates / volume            : 0.216%
+
+--- COPY-TRADE RELEVANT NUMBERS --------------------------------------------------
+  median fill notional        : $5.86    p90 $68
+  fills < $100 / < $500       : 93.7% / 99.9%
+  median fills / active day   : 3,866
+  top-3 event volume share    : 0.2%
+  median hold                 : 0.09 h
+  median fills per market     : 3
+  open book value             : $900  (plus redeemable $129)
+  last trade                  : 2026-11-22 14:38

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+data/
+probe_*/
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.bak
+*.tmp
+.pytest_cache/
+.env
+.env.docker

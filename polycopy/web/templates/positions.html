@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}持仓 - PolyCopy{% endblock %}
+{% block content %}
+
+{% set status = data.status %}
+{% set pages = (((data.total - 1) // data.per_page) + 1) if data.total > 0 else 1 %}
+
+<div class="page-head">
+  <div>
+    <h1>持仓</h1>
+    <div class="page-sub">未平仓与已平仓仓位 · 标记价每 5 分钟更新</div>
+  </div>
+  <div class="head-meta">共 <b>{{ data.total }}</b> 个仓位</div>
+</div>
+
+<div class="tabs">
+  <a href="/positions?status=open" class="{{ 'active' if status == 'open' else '' }}">未平仓</a>
+  <a href="/positions?status=closed" class="{{ 'active' if status == 'closed' else '' }}">已平仓</a>
+  <a href="/positions?status=all" class="{{ 'active' if status == 'all' else '' }}">全部</a>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">仓位数</div>
+    <div class="stat-value">{{ data.totals.n or 0 }}</div>
+    <div class="stat-sub">当前筛选范围</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">成本</div>
+    <div class="stat-value">{{ data.totals.cost|money }}</div>
+    <div class="stat-sub">按持仓均价计算</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">市值</div>
+    <div class="stat-value">{{ data.totals.value|money }}</div>
+    <div class="stat-sub">未平仓按标记价</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">浮动 / 已实现</div>
+    <div class="stat-value {{ 'green' if (data.totals.unrealized or 0) >= 0 else 'red' }}">
+      {{ data.totals.unrealized|signed_money }}
+    </div>
+    <div class="stat-sub">已实现 {{ data.totals.realized|signed_money }}</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>仓位明细</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>状态</th><th>市场</th><th>结果</th><th>数量</th><th>均价</th>
+          <th>标记价</th><th>浮动盈亏</th><th>已实现</th><th>更新时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in data.rows %}
+          {% set mark = p.mark_mid if p.mark_mid is not none else p.avg_cost %}
+          {% set upnl = p.shares * (mark - p.avg_cost) if p.status == 'OPEN' else 0 %}
+          <tr>
+            <td>
+              <span class="pill {{ 'ok' if p.status == 'OPEN' else 'idle' }}">
+                {{ '未平仓' if p.status == 'OPEN' else '已平仓' }}
+              </span>
+            </td>
+            <td title="{{ p.title }}">{{ p.title|short_title(60) }}</td>
+            <td>{{ p.outcome or '--' }}</td>
+            <td class="mono">{{ p.shares|num(2) }}</td>
+            <td class="mono">{{ p.avg_cost|price }}</td>
+            <td class="mono">{{ (mark|price) if p.status == 'OPEN' else '--' }}</td>
+            <td class="mono {{ 'green' if upnl >= 0 else 'red' }}">
+              {{ (upnl|signed_money) if p.status == 'OPEN' else '--' }}
+            </td>
+            <td class="mono {{ 'green' if (p.realized_pnl or 0) >= 0 else 'red' }}">
+              {{ p.realized_pnl|signed_money }}
+            </td>
+            <td class="mono muted">{{ p.updated_at|dt_bj }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9" class="no-data">暂无仓位</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pager">
+    {% if data.page > 1 %}
+      <a href="/positions?status={{ status }}&page={{ data.page - 1 }}">上一页</a>
+    {% else %}
+      <span class="disabled">上一页</span>
+    {% endif %}
+    <span class="pager-info">第 {{ data.page }} / {{ pages }} 页 · 共 {{ data.total }} 个</span>
+    {% if data.page < pages %}
+      <a href="/positions?status={{ status }}&page={{ data.page + 1 }}">下一页</a>
+    {% else %}
+      <span class="disabled">下一页</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="section">
+  <h2>最近结算 <span class="count">{{ settlements|length }}</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>时间</th><th>市场</th><th>结果</th><th>份额</th><th>兑付</th><th>已实现</th></tr>
+      </thead>
+      <tbody>
+        {% for s in settlements %}
+          <tr>
+            <td class="mono">{{ s.ts|dt_bj }}</td>
+            <td title="{{ s.title }}">{{ (s.title or s.condition_id)|short_title(58) }}</td>
+            <td>{{ s.outcome or '--' }}</td>
+            <td class="mono">{{ s.shares|num(2) }}</td>
+            <td class="mono">{{ s.payout|money }}</td>
+            <td class="mono {{ 'green' if (s.realized_pnl or 0) >= 0 else 'red' }}">{{ s.realized_pnl|signed_money }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="no-data">暂无结算记录</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
