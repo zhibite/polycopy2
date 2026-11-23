@@ -6,8 +6,8 @@ poll_seconds = 5
 overlap_seconds = 900
 stale_signal_seconds = 300
 # Polymarket taker fee = shares * fee_rate * p * (1-p).
-# 0.01 is the documented rate for general crypto markets; BTC 5m/15m up/down is 0.05.
-fee_rate = 0.01
+# Crypto markets currently use 0.07 (check the official fee table for other categories).
+fee_rate = 0.07
 extra_slippage = 0.0
 min_fill_ratio = 0.5
 max_buy_drift = 0.03

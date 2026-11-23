@@ -17,7 +17,7 @@ class PaperConfig:
     poll_seconds: int = 5
     overlap_seconds: int = 900
     stale_signal_seconds: int = 300
-    fee_rate: float = 0.01          # Polymarket: fee = shares * price * (1-price) * fee_rate
+    fee_rate: float = 0.07          # Polymarket crypto taker fee: shares * p * (1-p) * 0.07
     extra_slippage: float = 0.0     # added to buy VWAP / subtracted from sell VWAP
     min_fill_ratio: float = 0.5     # skip when the book can only fill less than this share
     max_buy_drift: float = 0.03     # max price above the target's fill we will pay

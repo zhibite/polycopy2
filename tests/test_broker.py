@@ -16,6 +16,8 @@ class BrokerTest(unittest.TestCase):
         self.assertAlmostEqual(taker_fee(100, 0.50, 0.01), 0.25)
         self.assertAlmostEqual(taker_fee(100, 0.30, 0.01), 0.21)
         self.assertAlmostEqual(taker_fee(100, 0.95, 0.01), 0.0475)
+        # Current Polymarket crypto taker rate: 0.07.
+        self.assertAlmostEqual(taker_fee(100, 0.50, 0.07), 1.75)
 
     def test_parse_book_reads_tick_size(self):
         book = parse_book({
