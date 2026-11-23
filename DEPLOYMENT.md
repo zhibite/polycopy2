@@ -16,21 +16,21 @@ Coolify / Docker
 Traefik（Coolify 自带）负责 `polycopy.bquant.com` 的 HTTPS 与转发。
 纸盘引擎仍运行在 host 上；Web 容器只是读取同一个数据库。
 
-## 一、Coolify 部署步骤
+## 一、Coolify 部署步骤（Docker Compose）
 
 1. 把本项目推到 Git 仓库（或使用 Coolify 支持的部署源）。
-2. Coolify → **New Resource** → **Docker Compose**（推荐，直接使用
-   `docker-compose.yml`），或 **Dockerfile**。
-3. 端口/域名：
-   - 容器端口：**8040**
-   - 域名：`polycopy.bquant.com`
-   - Coolify 会自动申请 Let's Encrypt 证书（DNS 已指向本机）。
-4. **持久化挂载（关键）**：
-   - Source：`/root/polycopy`
-   - Destination：`/app/project`
-   - 如果使用仓库里的 `docker-compose.yml`，该挂载已配置好；在 Coolify
-     的 Compose 界面确认它没有被覆盖。
-5. 环境变量（Compose 已从 `.env.docker` 读取，Coolify 可覆盖）：
+2. **先停掉/删除旧的 Dockerfile 部署**（如果已经建过），避免占用
+   `polycopy.bquant.com` 域名。然后 Coolify → **New Resource** →
+   **Docker Compose**，选择本仓库的 `docker-compose.yml`。
+3. 服务与域名：
+   - 服务名：`polycopy-web`
+   - 容器端口：**8040**（Compose 里已 `expose: 8040`）
+   - 域名：`polycopy.bquant.com`，分配给 `polycopy-web` 服务
+   - Coolify 会自动申请 Let's Encrypt 证书（DNS 已指向本机）
+4. **持久化挂载**：`docker-compose.yml` 已包含
+   `${POLY_HOST_DIR:-/root/polycopy}:/app/project`。如果项目在宿主机
+   其他路径，在 Coolify 环境变量里设置 `POLY_HOST_DIR=<实际路径>`。
+5. 环境变量（Coolify 面板设置，Compose 会用默认值兜底）：
    ```
    WEB_USERNAME=admin
    WEB_PASSWORD=<建议设置强密码；不设置则使用内置默认 poly@4321>
@@ -39,12 +39,17 @@ Traefik（Coolify 自带）负责 `polycopy.bquant.com` 的 HTTPS 与转发。
    POLY_PROJECT_DIR=/app/project
    POLY_DB_PATH=/app/project/data/paper_f705.db
    POLY_CONFIG_PATH=/app/project/configs/paper_f705.toml
+   POLY_HOST_DIR=/root/polycopy
    ```
    也可以复制 `.env.example` 为 `.env.docker` 后填写（`.env.docker` 已加入
    `.gitignore`，不要提交密码）。
 6. 健康检查路径：`/api/health`（无需登录）。
 7. 部署后访问 `https://polycopy.bquant.com`，使用 `admin / poly@4321`
    或你在 Coolify 设置的账号密码登录。
+
+> Coolify 的 Compose 部署不会读取源码仓库之外的 `ports` 发布；本文件使用
+> `expose: 8040` 让 Traefik 直接连容器。如果页面 502，检查域名是否绑定到
+> `polycopy-web`、服务是否暴露 8040。
 
 ## 二、手工 Docker 运行（不使用 Coolify UI 时）
 
