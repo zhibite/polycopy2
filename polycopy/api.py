@@ -77,6 +77,18 @@ class ClobApi:
         body = self.http.get_json(CLOB_API + "/book", {"token_id": token_id})
         return body if isinstance(body, dict) else None
 
+    def market_by_token(self, token_id: str) -> dict[str, Any] | None:
+        """Resolve a CTF token id to its condition (used by the on-chain feed)."""
+        body = self.http.get_json(
+            CLOB_API + "/markets-by-token/" + str(token_id)
+        )
+        return body if isinstance(body, dict) else None
+
+    def market(self, condition_id: str) -> dict[str, Any] | None:
+        """Market metadata: question, slug, tokens/outcomes (on-chain feed)."""
+        body = self.http.get_json(CLOB_API + "/markets/" + str(condition_id))
+        return body if isinstance(body, dict) else None
+
     def fee_rate(self, token_id: str) -> float | None:
         """Return the market's fee rate, or None.
 

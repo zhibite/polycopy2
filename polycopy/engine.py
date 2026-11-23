@@ -29,7 +29,7 @@ class Engine:
         self._cycles = 0
         self._cfg_mtime: float | None = None
 
-    def _maybe_reload_config(self) -> None:
+    def maybe_reload_config(self) -> None:
         """Pick up edits made in the web dashboard without a restart."""
         path = self.cfg.path
         if path is None:
@@ -55,8 +55,7 @@ class Engine:
 
     # ------------------------------------------------------------------ cycle
     def cycle(self) -> None:
-        self._maybe_reload_config()
-        now = int(time.time())
+        self.maybe_reload_config()
         for name, target in self.cfg.targets.items():
             if not target.enabled:
                 continue
@@ -64,7 +63,11 @@ class Engine:
                 self.process_target(name, target)
             except Exception:
                 self.log.exception("target %s failed", name)
+        self.maintenance()
 
+    def maintenance(self) -> None:
+        """Settlement, marks and heartbeat; safe to call from any source loop."""
+        now = int(time.time())
         if now - self._last_settle >= self.cfg.paper.settle_every_seconds:
             try:
                 self.settle()
@@ -116,10 +119,26 @@ class Engine:
             limit=self.cfg.paper.page_limit,
             max_pages=self.cfg.paper.max_pages,
         )
-        new_rows = []
+        self.ingest_rows(name, target, rows, start_ts=start, source="data_api")
+
+        if rows:
+            newest = max(int(r.get("timestamp") or 0) for r in rows)
+            if newest > cursor:
+                self.store.set_kv(cursor_key, str(newest))
+
+    def ingest_rows(self, name: str, target: TargetConfig,
+                    rows: list[dict[str, Any]], *, source: str = "data_api",
+                    start_ts: int | None = None) -> list[dict[str, Any]]:
+        """Record and act on activity rows from any signal source.
+
+        Shared by the data-api poller and the on-chain feed so both paths use
+        exactly the same de-duplication, rule gates and paper execution.
+        """
+        address = target.address.lower()
+        new_rows: list[dict[str, Any]] = []
         for row in rows:
             ts = int(row.get("timestamp") or 0)
-            if ts < start:
+            if start_ts is not None and ts < start_ts:
                 continue
             key = rules.dedupe_key(row)
             if self.store.insert_target_fill(key, address, row):
@@ -127,20 +146,16 @@ class Engine:
 
         for row in sorted(new_rows, key=lambda r: int(r.get("timestamp") or 0)):
             try:
-                self._handle_row(name, target, row)
+                self._handle_row(name, target, row, source=source)
             except Exception:
                 self.log.exception("row handling failed target=%s row=%s",
                                    name, json.dumps(row, ensure_ascii=False)[:400])
-
-        if rows:
-            newest = max(int(r.get("timestamp") or 0) for r in rows)
-            if newest > cursor:
-                self.store.set_kv(cursor_key, str(newest))
+        return new_rows
 
     def _handle_row(self, name: str, target: TargetConfig,
-                    row: dict[str, Any]) -> None:
+                    row: dict[str, Any], *,
+                    source: str = "data_api") -> None:
         kind = (row.get("type") or "").upper()
-        ts = int(row.get("timestamp") or 0)
         cond = str(row.get("condition_id") or "")
         token = str(row.get("token_id") or "")
         size = rules.to_float(row.get("size"))
@@ -152,14 +167,14 @@ class Engine:
                 frac = min(1.0, size / before) if before > 1e-9 else 0.0
                 self.store.add_target_shares(target.address, cond, token, -size)
                 if not target.copy_sells:
-                    self._skip(target, row, "sells_disabled")
+                    self._skip(target, row, "sells_disabled", source=source)
                 elif frac <= 0:
-                    self._skip(target, row, "target_no_position")
+                    self._skip(target, row, "target_no_position", source=source)
                 else:
-                    self._copy_sell(name, target, row, frac)
+                    self._copy_sell(name, target, row, frac, source=source)
             else:
                 self.store.add_target_shares(target.address, cond, token, size)
-                self._copy_buy(name, target, row)
+                self._copy_buy(name, target, row, source=source)
         elif kind == "REDEEM":
             self.store.set_target_shares(target.address, token, 0.0)
         elif kind in ("SPLIT", "MERGE"):
@@ -172,7 +187,7 @@ class Engine:
 
     # --------------------------------------------------------------- copy buys
     def _copy_buy(self, name: str, target: TargetConfig,
-                  row: dict[str, Any]) -> None:
+                  row: dict[str, Any], *, source: str = "data_api") -> None:
         cond = str(row.get("condition_id") or "")
         token = str(row.get("token_id") or "")
         signal_price = rules.to_float(row.get("price"))
@@ -182,14 +197,15 @@ class Engine:
         existing = self.store.position(target.address, cond, token)
         has_position = bool(existing and existing.get("status") == "OPEN")
         market_usd = self.store.market_exposure(cond)
+        open_positions = self.store.count_open_positions()
         reason = rules.buy_skip_reason(
             target, row, now=now,
             stale_seconds=self.cfg.paper.stale_signal_seconds,
-            open_positions=self.store.count_open_positions(),
+            open_positions=open_positions,
             has_position=has_position, market_usd=market_usd,
         )
         if reason:
-            self._skip(target, row, reason)
+            self._skip(target, row, reason, source=source)
             return
 
         account = self.store.account()
@@ -201,10 +217,10 @@ class Engine:
         if budget < target.min_notional_usd:
             need = target.min_notional_usd
             if available < need:
-                self._skip(target, row, "insufficient_cash")
+                self._skip(target, row, "insufficient_cash", source=source)
                 return
             if remaining_market < need:
-                self._skip(target, row, "max_market_exposure")
+                self._skip(target, row, "max_market_exposure", source=source)
                 return
             budget = need
 
@@ -214,19 +230,19 @@ class Engine:
             need = self.cfg.paper.min_shares * price_ref
             if (need > target.max_notional_usd or need > remaining_market
                     or need > available):
-                self._skip(target, row, "below_min_size")
+                self._skip(target, row, "below_min_size", source=source)
                 return
             shares = self.cfg.paper.min_shares
             budget = need
 
         payload = self.clob.book(token)
         if not payload:
-            self._skip(target, row, "book_unavailable")
+            self._skip(target, row, "book_unavailable", source=source)
             return
         book = broker.parse_book(payload)
         ex, reason = broker.simulate_buy(book, shares, signal_price, self.cfg.paper)
         if ex is None:
-            self._skip(target, row, reason or "no_fill")
+            self._skip(target, row, reason or "no_fill", source=source)
             return
 
         fee_rate = self._fee_rate(target)
@@ -243,11 +259,11 @@ class Engine:
             if scaled * ex.price < target.min_notional_usd:
                 reason = ("insufficient_cash" if available < remaining_market
                           else "max_market_exposure")
-                self._skip(target, row, reason)
+                self._skip(target, row, reason, source=source)
                 return
             ex2, reason = broker.simulate_buy(book, scaled, signal_price, self.cfg.paper)
             if ex2 is None:
-                self._skip(target, row, reason or "no_fill")
+                self._skip(target, row, reason or "no_fill", source=source)
                 return
             ex = ex2
             notional = ex.shares * ex.price
@@ -263,41 +279,55 @@ class Engine:
         self._record_signal(
             target, row, copied=True, reason=None, our_shares=ex.shares,
             our_price=ex.price, our_notional=notional, our_fee=fee,
+            source=source,
         )
+        title = str(row.get("title") or "")[:60]
         self.log.info(
-            "COPY BUY %-8s px=%.3f sh=%.2f $=%.2f fee=%.4f latency=%.1fs %s",
-            name, ex.price, ex.shares, notional, fee,
-            time.time() - int(row.get("timestamp") or 0),
-            str(row.get("title") or "")[:60],
+            "COPY BUY %-8s px=%.3f sh=%.2f $=%.2f fee=%.4f open=%d "
+            "mkt=$%.2f cash=$%.2f latency=%.1fs %s",
+            name, ex.price, ex.shares, notional, fee, open_positions,
+            market_usd, cash, time.time() - int(row.get("timestamp") or 0),
+            title,
         )
+        if 0.60 <= signal_price <= 0.70:
+            self.log.info(
+                "THIN-EDGE 60-70c buy target=%.4f our=%.4f slip=%+.2fc "
+                "open=%d mkt=$%.2f cash=$%.2f %s",
+                signal_price, ex.price, (ex.price - signal_price) * 100.0,
+                open_positions, market_usd, cash, title,
+            )
 
     # -------------------------------------------------------------- copy sells
     def _copy_sell(self, name: str, target: TargetConfig,
-                   row: dict[str, Any], frac: float) -> None:
+                   row: dict[str, Any], frac: float, *,
+                   source: str = "data_api") -> None:
         cond = str(row.get("condition_id") or "")
         token = str(row.get("token_id") or "")
         signal_price = rules.to_float(row.get("price"))
         pos = self.store.position(target.address, cond, token)
         if not pos or pos.get("status") != "OPEN" or float(pos["shares"]) <= 0:
-            self._skip(target, row, "no_position")
+            self._skip(target, row, "no_position", source=source)
             return
 
         our_shares = float(pos["shares"]) * frac
         if our_shares < self.cfg.paper.min_shares:
-            self._skip(target, row, "dust")
+            self._skip(target, row, "dust", source=source)
             return
 
         payload = self.clob.book(token)
         if not payload:
-            self._skip(target, row, "book_unavailable")
+            self._skip(target, row, "book_unavailable", source=source)
             return
         book = broker.parse_book(payload)
         ex, reason = broker.simulate_sell(book, our_shares, signal_price, self.cfg.paper)
         if ex is None:
-            self._skip(target, row, reason or "no_fill")
+            self._skip(target, row, reason or "no_fill", source=source)
             return
 
         fee = broker.taker_fee(ex.shares, ex.price, self._fee_rate(target))
+        open_positions = self.store.count_open_positions()
+        market_usd = self.store.market_exposure(cond)
+        cash = float(self.store.account()["cash"])
         result = self.store.apply_sell(
             ts=int(time.time()), target=target.address, signal_id=None,
             condition_id=cond, token_id=token,
@@ -305,21 +335,26 @@ class Engine:
             price=ex.price, fee=fee,
         )
         if result is None:
-            self._skip(target, row, "no_position")
+            self._skip(target, row, "no_position", source=source)
             return
         self._record_signal(
             target, row, copied=True, reason=None, our_shares=ex.shares,
             our_price=ex.price, our_notional=result["notional"], our_fee=fee,
+            source=source,
         )
         self.log.info(
-            "COPY SELL %-8s px=%.3f sh=%.2f $=%.2f fee=%.4f frac=%.2f %s",
+            "COPY SELL %-8s px=%.3f sh=%.2f $=%.2f fee=%.4f frac=%.2f "
+            "open=%d mkt=$%.2f cash=$%.2f %s",
             name, ex.price, ex.shares, result["notional"], fee, frac,
+            open_positions, market_usd, cash,
             str(row.get("title") or "")[:60],
         )
 
     # ------------------------------------------------------------------ helpers
-    def _skip(self, target: TargetConfig, row: dict[str, Any], reason: str) -> None:
-        self._record_signal(target, row, copied=False, reason=reason)
+    def _skip(self, target: TargetConfig, row: dict[str, Any], reason: str, *,
+              source: str = "data_api") -> None:
+        self._record_signal(target, row, copied=False, reason=reason,
+                            source=source)
         self.log.debug("skip %s %s px=%s usd=%.4f",
                        reason, target.address, row.get("price"),
                        rules.target_usd(row))
@@ -329,7 +364,8 @@ class Engine:
                        our_shares: float | None = None,
                        our_price: float | None = None,
                        our_notional: float | None = None,
-                       our_fee: float | None = None) -> None:
+                       our_fee: float | None = None,
+                       source: str = "data_api") -> None:
         ts = int(row.get("timestamp") or 0)
         self.store.record_signal(
             target=target.address,
@@ -347,6 +383,7 @@ class Engine:
             event_slug=str(row.get("event_slug") or ""),
             copied=copied, reason=reason, our_shares=our_shares,
             our_price=our_price, our_notional=our_notional, our_fee=our_fee,
+            source=source,
         )
 
     def _fee_rate(self, target: TargetConfig) -> float:
@@ -384,8 +421,9 @@ class Engine:
 
     # ---------------------------------------------------------------- settlement
     def settle(self) -> int:
+        """Resolve closed markets; fetch metadata first, write as one batch."""
         now = int(time.time())
-        settled = 0
+        actions: list[tuple[dict[str, Any], float, str, str]] = []
         for cond in self.store.open_conditions():
             market = self._market(cond)
             if not market or not market.get("closed"):
@@ -403,21 +441,30 @@ class Engine:
             winner = outcomes[values.index(max(values))]
             for pos in self.store.positions_for_condition(cond):
                 payout = 1.0 if _norm(pos.get("outcome")) == _norm(winner) else 0.0
-                realized = self.store.settle_position(pos, payout, now)
-                settled += 1
-                self.log.info(
-                    "SETTLE %s winner=%s our=%s payout=%.2f realized=$%.2f %s",
-                    cond[:10], winner, pos.get("outcome"), payout, realized,
-                    str(pos.get("title") or "")[:50],
-                )
+                actions.append((pos, payout, winner, cond))
+        settled = 0
+        for pos, payout, winner, cond in actions:
+            realized = self.store.settle_position(pos, payout, now)
+            settled += 1
+            self.log.info(
+                "SETTLE %s winner=%s our=%s payout=%.2f realized=$%.2f %s",
+                cond[:10], winner, pos.get("outcome"), payout, realized,
+                str(pos.get("title") or "")[:50],
+            )
         self.store.commit()
         return settled
 
     # --------------------------------------------------------------------- marks
     def mark(self) -> int:
+        """Refresh marks; fetch books first, then write in one short batch.
+
+        Keeping the SQLite write lock out of the HTTP loop matters for the
+        on-chain runner, whose signal loop shares the database with the
+        background maintenance thread.
+        """
         now = int(time.time())
         positions = self.store.open_positions(limit=self.cfg.paper.mark_limit)
-        marked = 0
+        updates: list[tuple[str, float | None, float | None, float | None]] = []
         for pos in positions:
             payload = self.clob.book(pos["token_id"])
             if not payload:
@@ -431,11 +478,12 @@ class Engine:
                 mid = bid
             else:
                 mid = (bid + ask) / 2.0
-            self.store.set_mark(pos["token_id"], bid, ask, mid, now)
-            marked += 1
+            updates.append((pos["token_id"], bid, ask, mid))
             time.sleep(0.05)
+        for token_id, bid, ask, mid in updates:
+            self.store.set_mark(token_id, bid, ask, mid, now)
         self.store.commit()
-        return marked
+        return len(updates)
 
 
 def _json_list(value: Any) -> list[str]:

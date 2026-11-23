@@ -7,6 +7,10 @@ from .config import TargetConfig
 
 
 def dedupe_key(row: dict[str, Any]) -> str:
+    # Deliberately identical for data-api and on-chain rows: the on-chain
+    # decoder reproduces every field (tx, condition, token, side, size, price,
+    # block timestamp), so running both sources into one DB will process a
+    # fill once.  The per-process feed still dedupes on (tx_hash, log_index).
     return "|".join(
         [
             str(row.get("transaction_hash") or ""),

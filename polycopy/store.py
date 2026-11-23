@@ -5,7 +5,7 @@ import json
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS account (
@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS signals (
     our_price REAL,
     our_notional REAL,
     our_fee REAL,
+    source TEXT NOT NULL DEFAULT 'data_api',
     created_at INTEGER NOT NULL,
     UNIQUE(target, dedupe_key)
 );
@@ -154,6 +155,14 @@ class Store:
         if "realized_pnl" not in cols:
             self.conn.execute(
                 "ALTER TABLE fills ADD COLUMN realized_pnl REAL NOT NULL DEFAULT 0"
+            )
+        signal_cols = {
+            row[1] for row in self.conn.execute("PRAGMA table_info(signals)")
+        }
+        if "source" not in signal_cols:
+            self.conn.execute(
+                "ALTER TABLE signals ADD COLUMN source TEXT NOT NULL"
+                " DEFAULT 'data_api'"
             )
 
     # ------------------------------------------------------------------ account
@@ -269,19 +278,29 @@ class Store:
                       reason: str | None, our_shares: float | None = None,
                       our_price: float | None = None,
                       our_notional: float | None = None,
-                      our_fee: float | None = None) -> None:
+                      our_fee: float | None = None,
+                      source: str = "data_api") -> None:
         self.conn.execute(
             "INSERT OR IGNORE INTO signals(target, dedupe_key, ts, latency_seconds,"
             " side, condition_id, token_id, outcome, price, size, usd, title,"
             " event_slug, copied, reason, our_shares, our_price, our_notional,"
-            " our_fee, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " our_fee, source, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 target, dedupe_key, ts, latency_seconds, side, condition_id,
                 token_id, outcome, price, size, usd, title, event_slug,
                 1 if copied else 0, reason, our_shares, our_price, our_notional,
-                our_fee, int(time.time()),
+                our_fee, source, int(time.time()),
             ),
         )
+
+    def signal_for(self, target: str,
+                   dedupe_key: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM signals WHERE target = ? AND dedupe_key = ?",
+            (target, dedupe_key),
+        ).fetchone()
+        return dict(row) if row else None
 
     # -------------------------------------------------------------- positions
     def position(self, target: str, condition_id: str,
