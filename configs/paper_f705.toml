@@ -26,7 +26,7 @@ request_retries = 4
 db_path = "data/paper_f705.db"
 log_path = "data/paper_f705.log"
 
-# f705 — full price-range mirror experiment (no buy-price filter).
+# f705 — 30–70c core bucket with 1% sizing.
 [targets.f705]
 address = "0xf705fa045201391d9632b7f3cde06a5e24453ca7"
 enabled = true
@@ -35,9 +35,9 @@ scale_factor = 0.01
 fixed_notional_usd = 10.0
 min_notional_usd = 2.0
 max_notional_usd = 100.0
-buy_price_min = 0.0
-buy_price_max = 1.0
-min_target_usd = 0.0
+buy_price_min = 0.30
+buy_price_max = 0.70
+min_target_usd = 20.0
 max_target_usd = 1000000000000.0
 copy_sells = true
 initial_lookback_seconds = 300
