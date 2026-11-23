@@ -199,6 +199,17 @@
                value="{{ cfg.paper.max_sell_drift }}">
       </div>
       <div class="field">
+        <label>买入相对滑点上限（比例）</label>
+        <input type="number" step="any" min="0" max="1" name="paper.max_buy_drift_pct"
+               value="{{ cfg.paper.max_buy_drift_pct }}">
+        <div class="help">与绝对滑点取较小值，防止 0.003 这类低价 token 在 0.01+ 成交。</div>
+      </div>
+      <div class="field">
+        <label>卖出相对滑点上限（比例）</label>
+        <input type="number" step="any" min="0" max="1" name="paper.max_sell_drift_pct"
+               value="{{ cfg.paper.max_sell_drift_pct }}">
+      </div>
+      <div class="field">
         <label>最低成交比例</label>
         <input type="number" step="any" min="0" max="1" name="paper.min_fill_ratio"
                value="{{ cfg.paper.min_fill_ratio }}">

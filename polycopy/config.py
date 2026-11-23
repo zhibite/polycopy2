@@ -22,6 +22,8 @@ class PaperConfig:
     min_fill_ratio: float = 0.5     # skip when the book can only fill less than this share
     max_buy_drift: float = 0.03     # max price above the target's fill we will pay
     max_sell_drift: float = 0.10    # max price below the target's fill we will accept
+    max_buy_drift_pct: float = 0.10   # relative cap for cheap tokens
+    max_sell_drift_pct: float = 0.15  # relative cap for cheap tokens
     settle_every_seconds: int = 300
     mark_every_seconds: int = 300
     mark_limit: int = 100
@@ -69,8 +71,15 @@ def _filter_fields(cls: type, data: dict[str, Any]) -> dict[str, Any]:
     allowed = {f.name for f in fields(cls)}
     unknown = set(data) - allowed
     if unknown:
-        raise ValueError(f"unknown config keys for {cls.__name__}: {sorted(unknown)}")
-    return dict(data)
+        # Tolerate keys added by a newer version (rolling deploy) instead of
+        # crashing the dashboard/engine on an otherwise valid config file.
+        import logging
+
+        logging.getLogger("polycopy.config").warning(
+            "ignoring unknown config keys for %s: %s",
+            cls.__name__, sorted(unknown),
+        )
+    return {key: value for key, value in data.items() if key in allowed}
 
 
 def load_config(path: str | Path) -> AppConfig:

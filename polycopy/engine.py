@@ -320,8 +320,9 @@ class Engine:
     # ------------------------------------------------------------------ helpers
     def _skip(self, target: TargetConfig, row: dict[str, Any], reason: str) -> None:
         self._record_signal(target, row, copied=False, reason=reason)
-        self.log.debug("skip %s %s px=%s usd=%s",
-                       reason, target.address, row.get("price"), row.get("size"))
+        self.log.debug("skip %s %s px=%s usd=%.4f",
+                       reason, target.address, row.get("price"),
+                       rules.target_usd(row))
 
     def _record_signal(self, target: TargetConfig, row: dict[str, Any], *,
                        copied: bool, reason: str | None,

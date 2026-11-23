@@ -38,6 +38,19 @@ class ConfigIOTest(unittest.TestCase):
             self.assertTrue(path.with_name("config.toml.bak").exists())
             self.assertEqual(load_config(path).paper.poll_seconds, 9)
 
+    def test_unknown_keys_are_ignored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.toml"
+            path.write_text(
+                "[account]\nstarting_cash = 1000.0\n\n"
+                "[paper]\npoll_seconds = 5\nnew_option = 1\n\n"
+                "[targets.t]\naddress = \"0xabc\"\nfuture_flag = true\n",
+                encoding="utf-8",
+            )
+            cfg = load_config(path)
+            self.assertEqual(cfg.paper.poll_seconds, 5)
+            self.assertEqual(cfg.targets["t"].address, "0xabc")
+
     def test_none_fee_rate_is_omitted(self):
         cfg = AppConfig(
             account=AccountConfig(),

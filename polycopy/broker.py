@@ -13,29 +13,59 @@ class Level:
 
 
 @dataclass(frozen=True)
+class Book:
+    bids: tuple[Level, ...]
+    asks: tuple[Level, ...]
+    tick_size: float = 0.001
+
+
+@dataclass(frozen=True)
 class Execution:
     shares: float
     price: float
 
 
-def parse_book(payload: dict) -> tuple[list[Level], list[Level]]:
-    def levels(key: str) -> list[Level]:
+def parse_book(payload: dict) -> Book:
+    def levels(key: str) -> tuple[Level, ...]:
         out: list[Level] = []
         for item in payload.get(key) or []:
             try:
                 out.append(Level(float(item["price"]), float(item["size"])))
             except (KeyError, TypeError, ValueError):
                 continue
-        return out
-    return levels("bids"), levels("asks")
+        return tuple(out)
+    try:
+        tick = float(payload.get("tick_size") or 0.001)
+    except (TypeError, ValueError):
+        tick = 0.001
+    if tick <= 0:
+        tick = 0.001
+    return Book(bids=levels("bids"), asks=levels("asks"), tick_size=tick)
 
 
-def simulate_buy(book: tuple[list[Level], list[Level]], shares: float,
-                 signal_price: float, cfg: PaperConfig) -> tuple[Execution | None, str | None]:
-    """Take liquidity from asks, walking levels up to signal_price + max drift."""
-    _, asks = book
-    cap = signal_price + cfg.max_buy_drift
-    eligible = sorted((lv for lv in asks if lv.price <= cap + 1e-12),
+def buy_cap(signal_price: float, cfg: PaperConfig, tick_size: float) -> float:
+    """Max price we accept: absolute drift cap AND relative drift cap.
+
+    The relative cap stops low-priced tokens (e.g. 0.003) from filling at
+    0.01–0.03, which the absolute 3c cap would otherwise allow. One tick of
+    headroom keeps very cheap tokens tradable.
+    """
+    absolute = signal_price + cfg.max_buy_drift
+    relative = signal_price * (1.0 + cfg.max_buy_drift_pct)
+    return min(absolute, max(relative, signal_price + max(tick_size, 0.0)))
+
+
+def sell_floor(signal_price: float, cfg: PaperConfig, tick_size: float) -> float:
+    absolute = signal_price - cfg.max_sell_drift
+    relative = signal_price * (1.0 - cfg.max_sell_drift_pct)
+    return max(absolute, min(relative, signal_price - max(tick_size, 0.0)))
+
+
+def simulate_buy(book: Book, shares: float, signal_price: float,
+                 cfg: PaperConfig) -> tuple[Execution | None, str | None]:
+    """Take liquidity from asks, walking levels up to the allowed cap."""
+    cap = buy_cap(signal_price, cfg, book.tick_size)
+    eligible = sorted((lv for lv in book.asks if lv.price <= cap + 1e-12),
                       key=lambda lv: lv.price)
     if not eligible:
         return None, "drift"
@@ -50,12 +80,11 @@ def simulate_buy(book: tuple[list[Level], list[Level]], shares: float,
     return Execution(filled, avg), None
 
 
-def simulate_sell(book: tuple[list[Level], list[Level]], shares: float,
-                  signal_price: float, cfg: PaperConfig) -> tuple[Execution | None, str | None]:
-    """Hit bids, walking levels down to signal_price - max drift."""
-    bids, _ = book
-    floor = signal_price - cfg.max_sell_drift
-    eligible = sorted((lv for lv in bids if lv.price >= floor - 1e-12),
+def simulate_sell(book: Book, shares: float, signal_price: float,
+                  cfg: PaperConfig) -> tuple[Execution | None, str | None]:
+    """Hit bids, walking levels down to the allowed floor."""
+    floor = sell_floor(signal_price, cfg, book.tick_size)
+    eligible = sorted((lv for lv in book.bids if lv.price >= floor - 1e-12),
                       key=lambda lv: -lv.price)
     if not eligible:
         return None, "drift"
@@ -89,8 +118,7 @@ def taker_fee(shares: float, price: float, fee_rate: float) -> float:
     return max(0.0, shares * price * (1.0 - price) * fee_rate)
 
 
-def best_bid_ask(book: tuple[list[Level], list[Level]]) -> tuple[float | None, float | None]:
-    bids, asks = book
-    bid = max((lv.price for lv in bids), default=None)
-    ask = min((lv.price for lv in asks), default=None)
+def best_bid_ask(book: Book) -> tuple[float | None, float | None]:
+    bid = max((lv.price for lv in book.bids), default=None)
+    ask = min((lv.price for lv in book.asks), default=None)
     return bid, ask

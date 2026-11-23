@@ -464,6 +464,8 @@ async def config_save(request: Request):
         fee_rate=_fnum(form, "paper.fee_rate", cfg.paper.fee_rate, errors, "手续费率", 0, 0.5),
         max_buy_drift=_fnum(form, "paper.max_buy_drift", cfg.paper.max_buy_drift, errors, "买入滑点上限", 0, 0.5),
         max_sell_drift=_fnum(form, "paper.max_sell_drift", cfg.paper.max_sell_drift, errors, "卖出滑点上限", 0, 0.5),
+        max_buy_drift_pct=_fnum(form, "paper.max_buy_drift_pct", cfg.paper.max_buy_drift_pct, errors, "买入相对滑点", 0, 1),
+        max_sell_drift_pct=_fnum(form, "paper.max_sell_drift_pct", cfg.paper.max_sell_drift_pct, errors, "卖出相对滑点", 0, 1),
         min_fill_ratio=_fnum(form, "paper.min_fill_ratio", cfg.paper.min_fill_ratio, errors, "最低成交比例", 0, 1),
         cash_reserve_pct=_fnum(form, "paper.cash_reserve_pct", cfg.paper.cash_reserve_pct, errors, "现金保留比例", 0, 0.9),
         settle_every_seconds=_fint(form, "paper.settle_every_seconds", cfg.paper.settle_every_seconds, errors, "结算检查间隔", 30, 86400),
