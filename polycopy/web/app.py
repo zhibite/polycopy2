@@ -248,7 +248,6 @@ def _render_login(request: Request, next_url: str, error: str | None,
             "request": request,
             "next": auth.safe_next(next_url),
             "error": error,
-            "credentials_configured": auth.credentials_configured(),
             "now_bj": _dt_bj(int(time.time())),
             "asset_version": ASSET_VERSION,
         },
@@ -275,12 +274,6 @@ def login_submit(
     next: str = Form("/"),
 ):
     ip = auth.client_ip(request)
-    if not auth.credentials_configured():
-        return _render_login(
-            request, next,
-            "服务端未配置 WEB_PASSWORD，无法登录。请在 Coolify 环境变量中设置后重启。",
-            status_code=503,
-        )
     if auth.login_blocked(ip):
         return _render_login(
             request, next, "登录失败次数过多，请 5 分钟后再试。", status_code=429

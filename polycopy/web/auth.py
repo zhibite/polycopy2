@@ -30,12 +30,16 @@ _sessions: dict[str, Session] = {}
 _failures: dict[str, list[float]] = {}
 
 
+DEFAULT_WEB_USERNAME = "admin"
+DEFAULT_WEB_PASSWORD = "poly@4321"
+
+
 def web_username() -> str:
-    return os.environ.get("WEB_USERNAME", "admin") or "admin"
+    return os.environ.get("WEB_USERNAME") or DEFAULT_WEB_USERNAME
 
 
 def web_password() -> str:
-    return os.environ.get("WEB_PASSWORD", "")
+    return os.environ.get("WEB_PASSWORD") or DEFAULT_WEB_PASSWORD
 
 
 def credentials_configured() -> bool:

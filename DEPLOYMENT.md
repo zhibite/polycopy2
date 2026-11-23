@@ -33,7 +33,7 @@ Traefik（Coolify 自带）负责 `polycopy.bquant.com` 的 HTTPS 与转发。
 5. 环境变量（Compose 已从 `.env.docker` 读取，Coolify 可覆盖）：
    ```
    WEB_USERNAME=admin
-   WEB_PASSWORD=<在 Coolify 设置强密码>
+   WEB_PASSWORD=<建议设置强密码；不设置则使用内置默认 poly@4321>
    WEB_PORT=8040
    WEB_SESSION_TTL_S=604800
    POLY_PROJECT_DIR=/app/project
@@ -43,7 +43,8 @@ Traefik（Coolify 自带）负责 `polycopy.bquant.com` 的 HTTPS 与转发。
    也可以复制 `.env.example` 为 `.env.docker` 后填写（`.env.docker` 已加入
    `.gitignore`，不要提交密码）。
 6. 健康检查路径：`/api/health`（无需登录）。
-7. 部署后访问 `https://polycopy.bquant.com`，使用你在 Coolify 设置的账号密码登录。
+7. 部署后访问 `https://polycopy.bquant.com`，使用 `admin / poly@4321`
+   或你在 Coolify 设置的账号密码登录。
 
 ## 二、手工 Docker 运行（不使用 Coolify UI 时）
 
@@ -96,14 +97,15 @@ curl -i -c /tmp/c.txt -d 'username=admin&password=poly%404321&next=/' \
 |---|---|
 | 页面能开但数据全为 0 | 挂载路径不对，容器内 `/app/project/data/paper_f705.db` 不存在 |
 | 引擎显示离线 | host 上的 `python3 -m polycopy run` 没运行，或心跳超过 90 秒 |
-| 登录页提示未配置密码 | 环境变量 `WEB_PASSWORD` 为空 |
+| 登录失败 | 默认账号 `admin / poly@4321`；如设置过 `WEB_PASSWORD` 则以环境变量为准 |
 | 保存配置失败（Permission denied） | 容器用户对挂载目录无写权限；以 root 运行容器或调整目录权限 |
 | 502 Bad Gateway | Coolify 路由端口不是 8040，或容器未启动 |
 | 修改配置后未生效 | 等待一个轮询周期；或检查引擎日志是否有 config reload 报错 |
 
 ## 七、安全建议
 
-- 默认密码仅用于首次上线，建议在 Coolify 环境变量中修改。
+- 代码内置了默认密码 `admin / poly@4321` 用于开箱即用。仓库是公开的，
+  生产环境务必在 Coolify 环境变量中设置 `WEB_USERNAME` / `WEB_PASSWORD` 覆盖。
 - 全站强制 HTTPS（Coolify 自动跳转）。
 - Web 容器只读数据库，唯一写操作是配置文件。
 - 不要在没有 TLS 的裸端口上长期暴露后台。

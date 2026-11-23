@@ -13,25 +13,16 @@
     <div class="login-sub">纸盘跟单控制台</div>
 
     {% if error %}<div class="alert warn">{{ error }}</div>{% endif %}
-    {% if not credentials_configured %}
-      <div class="alert warn">
-        服务端未配置 <code>WEB_PASSWORD</code>，无法登录。请在 Coolify 环境变量中设置
-        <code>WEB_USERNAME</code> / <code>WEB_PASSWORD</code> 后重新部署。
-      </div>
-    {% endif %}
 
     <form method="post" action="/login">
       <input type="hidden" name="next" value="{{ next }}">
       <label class="login-field">用户名
-        <input name="username" value="admin" autocomplete="username" required
-               {{ 'disabled' if not credentials_configured else '' }}>
+        <input name="username" value="admin" autocomplete="username" required>
       </label>
       <label class="login-field">密码
-        <input name="password" type="password" autocomplete="current-password" required
-               {{ 'disabled' if not credentials_configured else '' }}>
+        <input name="password" type="password" autocomplete="current-password" required>
       </label>
-      <button class="btn btn-primary login-btn" type="submit"
-              {{ 'disabled' if not credentials_configured else '' }}>登录</button>
+      <button class="btn btn-primary login-btn" type="submit">登录</button>
     </form>
     <div class="login-foot muted">仅限管理员访问 · 登录状态保留 7 天</div>
   </div>
