@@ -165,8 +165,9 @@
     <div class="config-grid">
       <div class="field">
         <label>轮询间隔（秒）</label>
-        <input type="number" step="1" min="5" max="3600" name="paper.poll_seconds"
+        <input type="number" step="1" min="2" max="3600" name="paper.poll_seconds"
                value="{{ cfg.paper.poll_seconds }}">
+        <div class="help">默认 5 秒。实际探测延迟还受 Polymarket activity 接口聚合影响，低于 3 秒通常不会更快。</div>
       </div>
       <div class="field">
         <label>回溯重叠窗口（秒）</label>

@@ -2,7 +2,7 @@
 starting_cash = 10000.0
 
 [paper]
-poll_seconds = 20
+poll_seconds = 5
 overlap_seconds = 900
 stale_signal_seconds = 300
 # Polymarket taker fee = shares * fee_rate * p * (1-p).

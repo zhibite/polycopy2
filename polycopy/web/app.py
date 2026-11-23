@@ -458,7 +458,7 @@ async def config_save(request: Request):
 
     paper = replace(
         cfg.paper,
-        poll_seconds=_fint(form, "paper.poll_seconds", cfg.paper.poll_seconds, errors, "轮询间隔", 5, 3600),
+        poll_seconds=_fint(form, "paper.poll_seconds", cfg.paper.poll_seconds, errors, "轮询间隔", 2, 3600),
         overlap_seconds=_fint(form, "paper.overlap_seconds", cfg.paper.overlap_seconds, errors, "回溯重叠", 0, 86400),
         stale_signal_seconds=_fint(form, "paper.stale_signal_seconds", cfg.paper.stale_signal_seconds, errors, "信号有效期", 0, 604800),
         fee_rate=_fnum(form, "paper.fee_rate", cfg.paper.fee_rate, errors, "手续费率", 0, 0.5),

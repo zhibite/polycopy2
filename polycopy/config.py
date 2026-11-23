@@ -14,7 +14,7 @@ class AccountConfig:
 
 @dataclass
 class PaperConfig:
-    poll_seconds: int = 20
+    poll_seconds: int = 5
     overlap_seconds: int = 900
     stale_signal_seconds: int = 300
     fee_rate: float = 0.01          # Polymarket: fee = shares * price * (1-price) * fee_rate
