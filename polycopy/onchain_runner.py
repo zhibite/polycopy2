@@ -51,9 +51,16 @@ class OnchainRunner:
         self._maintenance_thread: threading.Thread | None = None
 
     def run(self) -> int:
+        try:
+            self.engine.executor.reconcile()
+        except Exception:
+            self.log.exception("startup executor reconciliation failed")
         self.feed.start()
         self._start_maintenance()
-        self.log.info("on-chain paper loop started: %s", self.feed.stats())
+        self.log.info(
+            "on-chain loop started mode=%s dry_run=%s: %s",
+            "live" if self.engine.executor.is_live else "paper",
+            self.engine.cfg.live.dry_run, self.feed.stats())
         try:
             while True:
                 fill = self.feed.get(timeout=0.5)
@@ -117,6 +124,7 @@ class OnchainRunner:
             engine = Engine(
                 self.engine.cfg, store, self.engine.data, self.engine.clob,
                 self.engine.gamma, logger=self.log,
+                executor=self.engine.executor,
             )
             while not self._stop.wait(5.0):
                 try:
@@ -283,8 +291,10 @@ def build_and_run(engine: Engine, settings: OnchainSettings, *,
         logger=logging.getLogger("polycopy.onchain.feed"),
     )
     log.info(
-        "on-chain source: wallets=%s rpc=%s ws=%s start_block=%s lookback=%ss",
+        "on-chain source: wallets=%s rpc=%s ws=%s start_block=%s lookback=%ss"
+        " mode=%s dry_run=%s",
         wallets, settings.rpc_urls, settings.ws_urls or "polling",
         start_block, settings.lookback_seconds,
+        "live" if engine.executor.is_live else "paper", cfg.live.dry_run,
     )
     return OnchainRunner(engine, feed, resolver, settings, logger=log).run()

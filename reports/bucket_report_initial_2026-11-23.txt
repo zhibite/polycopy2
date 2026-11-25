@@ -1,0 +1,37 @@
+====================================================================================
+data-api  /root/polycopy/data/paper_f705.db
+====================================================================================
+signals=20 copied=2
+bucket     signals  copied  slip_med  slip_mean  slip_p90  slip_max  fee_med    notional   edge  net_med  flag
+<30c             5       0         -          -         -         -        -        0.00      -        -  
+30-50c           0       0         -          -         -         -        -        0.00   18.3        -  no copies yet
+50-60c           0       0         -          -         -         -        -        0.00   12.1        -  no copies yet
+60-70c           0       0         -          -         -         -        -        0.00    6.1        -  no copies yet
+>70c             2       2      0.17       0.44      0.71      0.71     0.04       41.61      -        -  
+
+slippage is cents/share; positive = worse than the target fill
+edge = historical fee-inclusive target edge (30-70c sample); net_med subtracts our median slip and median fee
+SELL copied=0  median slip=-  mean=-  p90=-
+
+concurrent exposure: samples=1  max_open=2 median_open=2  max_invested=$41.64 median_invested=$41.64  max_util=0.4%  max_market=$35.45  max_dd=0.00%
+  current: open=2 cash=$9958.36 invested=$41.64 equity=$10000.24 realized=$0.00
+
+====================================================================================
+onchain  /root/polycopy-onchain/data/paper_f705_onchain.db
+====================================================================================
+signals=0 copied=0
+bucket     signals  copied  slip_med  slip_mean  slip_p90  slip_max  fee_med    notional   edge  net_med  flag
+<30c             0       0         -          -         -         -        -        0.00      -        -  
+30-50c           0       0         -          -         -         -        -        0.00   18.3        -  no copies yet
+50-60c           0       0         -          -         -         -        -        0.00   12.1        -  no copies yet
+60-70c           0       0         -          -         -         -        -        0.00    6.1        -  no copies yet
+>70c             0       0         -          -         -         -        -        0.00      -        -  
+
+slippage is cents/share; positive = worse than the target fill
+edge = historical fee-inclusive target edge (30-70c sample); net_med subtracts our median slip and median fee
+SELL copied=0  median slip=-  mean=-  p90=-
+
+concurrent exposure: samples=1  max_open=0 median_open=0  max_invested=$0.00 median_invested=$0.00  max_util=0.0%  max_market=$0.00  max_dd=0.00%
+  current: open=0 cash=$10000.00 invested=$0.00 equity=$10000.00 realized=$0.00
+
+wrote data/bucket_report_initial.json

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from logging.handlers import RotatingFileHandler
@@ -12,6 +13,7 @@ from pathlib import Path
 from .api import ClobApi, DataApi, GammaApi
 from .config import AppConfig, load_config
 from .engine import Engine
+from .execution import LiveExecutor, build_executor
 from .http import HttpClient
 from .onchain import OnchainSettings, RpcClient
 from .onchain_runner import build_and_run
@@ -49,18 +51,32 @@ def setup_logging(cfg: AppConfig, log_path: str | None = None) -> logging.Logger
 
 
 def _build(cfg: AppConfig, db_path: str | None = None,
-           log_path: str | None = None):
-    setup_logging(cfg, log_path=log_path)
-    store = Store(db_path or cfg.paper.db_path)
+           log_path: str | None = None, mode: str | None = None):
+    selected = str(mode or cfg.run.mode).lower()
+    selected_db = db_path or (cfg.live.db_path if selected == "live"
+                              else cfg.paper.db_path)
+    selected_log = log_path or (cfg.live.log_path if selected == "live"
+                                else cfg.paper.log_path)
+    setup_logging(cfg, log_path=selected_log)
+    store = Store(selected_db)
     store.ensure_account(cfg.account.starting_cash)
     http = HttpClient(
         timeout=cfg.paper.request_timeout,
         retries=cfg.paper.request_retries,
         logger=logging.getLogger("polycopy.http"),
     )
+    clob = ClobApi(http)
+    try:
+        executor = build_executor(
+            cfg, store, clob, mode=mode,
+            logger=logging.getLogger("polycopy.execution"),
+        )
+    except Exception:
+        store.close()
+        raise
     return store, Engine(
-        cfg, store, DataApi(http), ClobApi(http), GammaApi(http),
-        logger=logging.getLogger("polycopy.engine"),
+        cfg, store, DataApi(http), clob, GammaApi(http),
+        logger=logging.getLogger("polycopy.engine"), executor=executor,
     )
 
 
@@ -123,14 +139,74 @@ def _cmd_verify(cfg: AppConfig, args: argparse.Namespace) -> int:
 
 
 def _cmd_onchain_run(cfg: AppConfig, args: argparse.Namespace) -> int:
-    store, engine = _build(cfg, db_path=args.db, log_path=args.log)
-    settings = _onchain_settings(args)
     try:
-        return build_and_run(
-            engine, settings, logger=logging.getLogger("polycopy.onchain"),
-        )
+        store, engine = _build(cfg, db_path=args.db, log_path=args.log,
+                               mode=args.mode)
+    except Exception as exc:  # noqa: BLE001
+        print(f"execution setup failed: {exc}", file=sys.stderr)
+        return 2
+    settings = _onchain_settings(args)
+    logger = logging.getLogger("polycopy.onchain")
+    logger.info("execution mode=%s live_dry_run=%s",
+                "live" if engine.executor.is_live else "paper",
+                cfg.live.dry_run)
+    try:
+        return build_and_run(engine, settings, logger=logger)
     finally:
         store.commit()
+
+
+def _cmd_live_check(cfg: AppConfig, args: argparse.Namespace) -> int:
+    setup_logging(cfg, log_path=args.log or cfg.live.log_path)
+    store = Store(args.db or cfg.live.db_path)
+    store.ensure_account(cfg.account.starting_cash)
+    http = HttpClient(
+        timeout=cfg.paper.request_timeout,
+        retries=cfg.paper.request_retries,
+        logger=logging.getLogger("polycopy.http"),
+    )
+    clob = ClobApi(http)
+    logger = logging.getLogger("polycopy.execution")
+    print(f"run.mode          : {cfg.run.mode}")
+    print(f"live.dry_run      : {cfg.live.dry_run}")
+    print(f"live.funder       : {cfg.live.funder or '(empty)'}")
+    print(f"live.signature    : {cfg.live.signature_type}")
+    key_set = bool(os.environ.get(cfg.live.private_key_env))
+    print(f"private key env   : {cfg.live.private_key_env} "
+          f"({'set' if key_set else 'MISSING'})")
+    if not key_set or not cfg.live.funder:
+        print("WARNING           : live non-dry-run needs both a private key"
+              " env var and a funder address")
+    kill = Path(cfg.live.kill_switch_path)
+    print(f"kill switch       : {kill} ({'ACTIVE' if kill.exists() else 'clear'})")
+    print(f"max order         : ${cfg.live.max_order_usd:,.2f}")
+    print(f"max total exposure: ${cfg.live.max_total_exposure_usd:,.2f}")
+    print(f"max daily loss    : ${cfg.live.max_daily_loss_usd:,.2f}")
+    try:
+        executor = build_executor(cfg, store, clob, mode="live", logger=logger)
+    except Exception as exc:  # noqa: BLE001
+        print(f"live executor     : ERROR {exc}")
+        return 1
+    if not isinstance(executor, LiveExecutor):
+        print("live executor     : unexpected executor type")
+        return 1
+    print("live executor     : ready")
+    print(f"SDK live gateway  : {'yes' if executor.gateway else 'no (dry_run)'}")
+    if executor.gateway is not None:
+        try:
+            print(f"collateral balance: {executor.balance()}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"collateral balance: ERROR {exc}")
+    if getattr(args, "sdk", False) and executor.gateway is None:
+        from .live_client import SdkClobGateway
+        try:
+            gateway = SdkClobGateway.from_config(cfg.live, logger=logger)
+            gateway.healthcheck()
+            print("SDK/auth check    : OK")
+        except Exception as exc:  # noqa: BLE001
+            print(f"SDK/auth check    : ERROR {exc}")
+            return 1
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -184,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     orun.add_argument("--config", default="configs/paper_f705.toml")
     orun.add_argument("--db", default=None,
-                      help="separate paper DB (recommended for parallel runs)")
+                      help="override the execution DB (use a separate live DB)")
     orun.add_argument("--log", default=None, help="override the log path")
     orun.add_argument("--trace", default=None,
                       help="append per-fill latency JSON lines to this path")
@@ -198,6 +274,22 @@ def main(argv: list[str] | None = None) -> int:
                       help="initial catch-up window in seconds at first start")
     orun.add_argument("--catchup-chunk", type=int, default=None,
                       help="blocks per eth_getLogs catch-up call")
+    orun.add_argument("--mode", choices=("paper", "live"), default=None,
+                      help="override run.mode for this process")
+
+    live = sub.add_parser(
+        "live", help="check live-trading readiness without submitting orders"
+    )
+    live_sub = live.add_subparsers(dest="live_command", required=True)
+    check = live_sub.add_parser(
+        "check", help="validate config, credentials, kill switch and SDK import"
+    )
+    check.add_argument("--config", default="configs/paper_f705.toml")
+    check.add_argument("--db", default=None,
+                       help="override the database path from the config")
+    check.add_argument("--log", default=None, help="override the log path")
+    check.add_argument("--sdk", action="store_true",
+                       help="also import the live SDK and derive API credentials")
 
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
@@ -207,6 +299,10 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_verify(cfg, args)
         if args.onchain_command == "run":
             return _cmd_onchain_run(cfg, args)
+        return 1
+    if args.command == "live":
+        if args.live_command == "check":
+            return _cmd_live_check(cfg, args)
         return 1
 
     if args.command == "init":

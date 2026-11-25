@@ -1,0 +1,224 @@
+{
+  "data-api": {
+    "path": "/root/polycopy/data/paper_f705.db",
+    "stats": {
+      "<30c": {
+        "signals": 5,
+        "copied": 0,
+        "skip_reasons": {
+          "price_out_of_range": 5
+        },
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": null,
+        "net_after_median_c": null
+      },
+      "30-50c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 18.3,
+        "net_after_median_c": null
+      },
+      "50-60c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 12.1,
+        "net_after_median_c": null
+      },
+      "60-70c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 6.1,
+        "net_after_median_c": null
+      },
+      ">70c": {
+        "signals": 2,
+        "copied": 2,
+        "skip_reasons": {},
+        "slip_median_c": 0.16523045999999875,
+        "slip_mean_c": 0.4391932899999951,
+        "slip_p90_c": 0.7131561199999914,
+        "slip_max_c": 0.7131561199999914,
+        "fee_median_c": 0.040236000000000036,
+        "notional": 41.61469918588149,
+        "edge_budget_c": null,
+        "net_after_median_c": null
+      },
+      "_sells": {
+        "copied": 0,
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null
+      }
+    },
+    "exposure": {
+      "samples": 1,
+      "first_ts": 1795433932,
+      "last_ts": 1795433932,
+      "max_open_positions": 2,
+      "median_open_positions": 2.0,
+      "max_invested": 41.641702,
+      "median_invested": 41.641702,
+      "max_cash_utilization": 0.004164,
+      "median_cash_utilization": 0.004164,
+      "max_market_exposure": 35.445037,
+      "equity_peak": 10000.239437,
+      "equity_trough": 10000.239437,
+      "max_drawdown_pct": 0.0,
+      "current": {
+        "ts": 1795433932,
+        "source": "data-api",
+        "db": "/root/polycopy/data/paper_f705.db",
+        "open_positions": 2,
+        "open_conditions": 2,
+        "invested": 41.641702,
+        "market_value": 41.881139,
+        "cash": 9958.358298,
+        "equity": 10000.239437,
+        "realized_pnl": 0.0,
+        "fees_paid": 0.027002,
+        "unrealized_pnl": 0.239437,
+        "cash_utilization": 0.004164,
+        "max_market_exposure": 35.445037,
+        "max_market_condition": "0x2d3883a6e9105c36eb803f85f00afcf3144246b086b0f30bb5000c0b646a913b",
+        "signals": 20,
+        "copied_signals": 2
+      }
+    }
+  },
+  "onchain": {
+    "path": "/root/polycopy-onchain/data/paper_f705_onchain.db",
+    "stats": {
+      "<30c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": null,
+        "net_after_median_c": null
+      },
+      "30-50c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 18.3,
+        "net_after_median_c": null
+      },
+      "50-60c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 12.1,
+        "net_after_median_c": null
+      },
+      "60-70c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 6.1,
+        "net_after_median_c": null
+      },
+      ">70c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": null,
+        "net_after_median_c": null
+      },
+      "_sells": {
+        "copied": 0,
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null
+      }
+    },
+    "exposure": {
+      "samples": 1,
+      "first_ts": 1795433932,
+      "last_ts": 1795433932,
+      "max_open_positions": 0,
+      "median_open_positions": 0.0,
+      "max_invested": 0.0,
+      "median_invested": 0.0,
+      "max_cash_utilization": 0.0,
+      "median_cash_utilization": 0.0,
+      "max_market_exposure": 0.0,
+      "equity_peak": 10000.0,
+      "equity_trough": 10000.0,
+      "max_drawdown_pct": 0.0,
+      "current": {
+        "ts": 1795433932,
+        "source": "onchain",
+        "db": "/root/polycopy-onchain/data/paper_f705_onchain.db",
+        "open_positions": 0,
+        "open_conditions": 0,
+        "invested": 0.0,
+        "market_value": 0.0,
+        "cash": 10000.0,
+        "equity": 10000.0,
+        "realized_pnl": 0.0,
+        "fees_paid": 0.0,
+        "unrealized_pnl": 0.0,
+        "cash_utilization": 0.0,
+        "max_market_exposure": 0.0,
+        "max_market_condition": null,
+        "signals": 0,
+        "copied_signals": 0
+      }
+    }
+  }
+}

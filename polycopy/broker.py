@@ -81,8 +81,21 @@ def simulate_buy(book: Book, shares: float, signal_price: float,
 
 
 def simulate_sell(book: Book, shares: float, signal_price: float,
-                  cfg: PaperConfig) -> tuple[Execution | None, str | None]:
-    """Hit bids, walking levels down to the allowed floor."""
+                  cfg: PaperConfig, *, strict: bool = False
+                  ) -> tuple[Execution | None, str | None]:
+    """Hit bids, walking levels down to the allowed floor.
+
+    ``strict`` is used for target exits: accept any available bid, partial
+    fills included, so a target liquidation cannot leave us holding an
+    orphaned position.  The caller retries any unfilled remainder.
+    """
+    if strict:
+        eligible = sorted(book.bids, key=lambda lv: -lv.price)
+        filled, proceeds = _walk(eligible, shares)
+        if filled <= 0:
+            return None, "no_liquidity"
+        return Execution(filled, proceeds / filled - cfg.extra_slippage), None
+
     floor = sell_floor(signal_price, cfg, book.tick_size)
     eligible = sorted((lv for lv in book.bids if lv.price >= floor - 1e-12),
                       key=lambda lv: -lv.price)

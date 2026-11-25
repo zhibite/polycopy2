@@ -1,0 +1,4 @@
+# Live execution only. The paper bot and dashboard do not need these.
+# Pin the version and re-test a $1 order after every upgrade; Polymarket is
+# migrating to Protocol V2 / pUSD, so SDK behaviour can change.
+py-clob-client-v2>=1.2.0,<2

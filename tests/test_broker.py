@@ -16,8 +16,19 @@ class BrokerTest(unittest.TestCase):
         self.assertAlmostEqual(taker_fee(100, 0.50, 0.01), 0.25)
         self.assertAlmostEqual(taker_fee(100, 0.30, 0.01), 0.21)
         self.assertAlmostEqual(taker_fee(100, 0.95, 0.01), 0.0475)
-        # Current Polymarket crypto taker rate: 0.07.
-        self.assertAlmostEqual(taker_fee(100, 0.50, 0.07), 1.75)
+        # Monthly/weekly crypto taker rate: 0.01.
+        self.assertAlmostEqual(taker_fee(100, 0.50, 0.01), 0.25)
+
+    def test_strict_sell_accepts_any_bid(self):
+        book = Book(bids=(Level(0.40, 100),), asks=())
+        cfg = PaperConfig(max_sell_drift=0.01, max_sell_drift_pct=0.01)
+        ex, reason = simulate_sell(book, 10, 0.60, cfg)
+        self.assertIsNone(ex)
+        self.assertEqual(reason, "drift")
+        ex, reason = simulate_sell(book, 10, 0.60, cfg, strict=True)
+        self.assertIsNotNone(ex)
+        self.assertAlmostEqual(ex.price, 0.40)
+        self.assertAlmostEqual(ex.shares, 10)
 
     def test_parse_book_reads_tick_size(self):
         book = parse_book({

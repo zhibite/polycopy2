@@ -1,0 +1,259 @@
+====================================================================================
+POLYMARKET WALLET PROFILE   0xf705fa045201391d9632b7f3cde06a5e24453ca7
+====================================================================================
+join date                     : -
+activity window fetched       : 2025-09-25 04:19  ..  2026-11-23 02:20  (424 days)
+last trade                    : 2026-11-23 02:20 (0.02 days ago)
+rows fetched                  : activity=66756  closed_pos=3914  open=184 redeemable=0 mergeable=0
+activity truncated            : {'activity': False, 'positions_open': False, 'positions_redeemable': False, 'positions_mergeable': False, 'positions_closed': False}
+
+--- ALL-TIME ACCOUNT -------------------------------------------------------------
+  volume (gross)              : $110.59M   one-side USDC $51.60M
+  trade count (stats/volume)  : 3027 / 61526
+  realized market PnL         : $2.88M
+  unrealized PnL (now)        : $-9.3K
+  maker rebate                : $776
+  taker rebate                : $65.8K
+  reward income               : $0.00
+  fees paid                   : $-305.6K
+  economic PnL (all-in)       : $2.94M
+  biggest single win          : $146.5K
+  economic PnL / volume       : 2.659%
+  leaderboard day            : rank_pnl 235875  rank_volume 254  name 0xf705fa045201391d9632b7f3cde06a5e24453ca7
+  leaderboard week           : rank_pnl 78  rank_volume 129  name 0xf705fa045201391d9632b7f3cde06a5e24453ca7
+  leaderboard month          : rank_pnl 68  rank_volume 141  name 0xf705fa045201391d9632b7f3cde06a5e24453ca7
+  leaderboard all            : rank_pnl 54  rank_volume 186  name 0xf705fa045201391d9632b7f3cde06a5e24453ca7
+
+--- PnL CURVE (daily, cumulative) -----------------------------------------------
+  first / last point          : 2025-09-26 00:00 $-26.6K  ..  2026-11-23 02:00 $2.94M
+  peak / max drawdown         : $2.94M / $-311.3K
+  monthly economic PnL / volume / trades:
+    2025-09  pnl    $-87.6K   volume     $1.20M   trades 660
+    2025-10  pnl    $533.9K   volume    $10.57M   trades 5336
+    2025-11  pnl    $641.3K   volume    $20.83M   trades 10199
+    2025-12  pnl    $-37.0K   volume    $28.37M   trades 14158
+    2026-01  pnl    $249.5K   volume    $41.59M   trades 20927
+    2026-02  pnl    $648.2K   volume    $55.52M   trades 28083
+    2026-03  pnl      $-502   volume    $61.93M   trades 31224
+    2026-04  pnl    $-76.3K   volume    $67.57M   trades 34562
+    2026-05  pnl    $-28.2K   volume    $72.52M   trades 37276
+    2026-06  pnl     $82.4K   volume    $79.35M   trades 41719
+    2026-07  pnl    $-92.1K   volume    $83.12M   trades 44257
+    2026-08  pnl    $380.9K   volume    $90.36M   trades 48632
+    2026-09  pnl     $17.5K   volume    $96.07M   trades 52497
+    2026-10  pnl    $289.4K   volume   $103.19M   trades 56852
+    2026-11  pnl    $419.6K   volume   $110.59M   trades 61526
+  last 7d economic PnL      : $82.0K
+  last 30d economic PnL      : $601.1K
+  last 90d economic PnL      : $663.4K
+
+--- ACTIVITY MIX ------------------------------------------------------------------
+  TRADE           61715 rows        $51.83M
+  REDEEM           2842 rows        $26.13M
+  MERGE            1684 rows         $2.71M
+  YIELD             175 rows          $6.1K
+  SPLIT             168 rows        $889.4K
+  TAKER_REBATE      140 rows         $65.8K
+  MAKER_REBATE       32 rows           $776
+  TRADE sides                 : BUY 42446 / SELL 19269
+
+--- EXIT MECHANISM ---------------------------------------------------------------
+  MERGE                       : 1684 rows, 2,713,936 pairs -> $2.71M (avg $1.00/share)
+  REDEEM                      : 2842 rows -> $26.13M   winning 1470 ($26.13M sh), worthless 1372 ($15.55M sh)
+  exit mix by USD             : merge 9.4% / redeem 90.6%
+  buy USD vs exits (this window): buys $38.66M  exits $28.84M  gross PnL $-9.82M
+
+--- MARKET-MAKING SIGNATURE ------------------------------------------------------
+  distinct conditions         : 3056
+  fills per condition         : median 10  p90 52  max 550
+  bought BOTH outcomes        : 1029 (33.7%)
+  combined pair cost (VWAP)   : p10 0.7931  p25 0.9556  median 1.0172  p75 1.0822  p90 1.1834
+  volume-weighted pair cost   : 1.0001  (edge -0.007% of notional at merge)
+    pair cost < 0.95           : 24.1%
+    pair cost < 0.98           : 29.8%
+    pair cost < 0.99           : 31.8%
+    pair cost < 1.0            : 37.2%
+    pair cost < 1.01           : 44.9%
+  pairs available / merged    : 9,537,544 / 2,022,888 (21.2%)
+  activity-window est. PnL    : $-10.43M  on $38.66M bought  (-26.986%)
+  per-market est. PnL         : median $-495  p10 $-12.2K  p90 $370  min $-187.1K  max $126.8K
+  profitable markets          : 26.7%
+  est. PnL by combined pair cost bucket:
+    <0.95     n=   248  PnL    $-2.80M  avg $-11.3K/market
+    0.95-0.98 n=    59  PnL   $-577.9K  avg $-9.8K/market
+    0.98-1.00 n=    76  PnL   $-457.2K  avg $-6.0K/market
+    1.00-1.02 n=   148  PnL   $-536.3K  avg $-3.6K/market
+    >1.02     n=   498  PnL    $-3.81M  avg $-7.7K/market
+  first buy -> first merge    : median -355.1m  p25 -4,150.2m  p75 7.4m  p90 51.1m
+
+--- FILL FREQUENCY & SIZE -------------------------------------------------------
+  active days                 : 425 / 424 calendar days (100.3%)
+  fills per active day        : median 106  p90 318  max 1152
+  avg fills/day overall       : 145.6
+  busiest days                : 2026-01-30 (1152), 2026-01-31 (767), 2026-01-23 (721), 2026-02-05 (694), 2026-02-13 (675)
+  fill notional              : p10 $    11.48 p25 $    37.25 p50 $   177.17 p75 $   796.76 p90 $ 2,389.00 p99 $ 9,180.00 max $233,775.99
+  fill shares                : p10    107.72 p25    300.00 p50    801.11 p75  2,245.83 p90  5,000.00 p99 10,000.00 max 234,010.00
+    <$10          5435 (  8.8%)   volume $25.9K
+    $10-50       12793 ( 20.7%)   volume $342.9K
+    $50-100       6937 ( 11.2%)   volume $501.3K
+    $100-500     16524 ( 26.8%)   volume $4.17M
+    $500-1K       7050 ( 11.4%)   volume $5.13M
+    $1K-5K       10791 ( 17.5%)   volume $24.33M
+    >$5K          2185 (  3.5%)   volume $17.34M
+  most repeated fill notional : $4 x605, $9 x547, $10 x524, $8 x513, $7 x511, $5 x504
+
+--- BUY PRICE LEVELS --------------------------------------------------------------
+    0-5c           5966    $321.3K (  0.8%) 
+    5-15c          9296     $1.41M (  3.6%) ##
+    15-30c         5812     $2.10M (  5.4%) ###
+    30-50c         2764     $1.99M (  5.2%) ###
+    50-70c         2031     $2.13M (  5.5%) ###
+    70-85c         3143     $3.71M (  9.6%) #####
+    85-95c         4980     $7.59M ( 19.6%) ###########
+    95-100c        8454    $19.41M ( 50.2%) ############################
+  share-weighted avg buy px   : 0.4937
+
+--- WHEN THEY QUOTE (UTC) ---------------------------------------------------------
+  00:00    2056 ##################
+  01:00    2188 ###################
+  02:00    2211 ###################
+  03:00    1749 ###############
+  04:00    1507 #############
+  05:00    1497 #############
+  06:00    1759 ###############
+  07:00    1787 ################
+  08:00    2355 #####################
+  09:00    2266 ####################
+  10:00    2011 ##################
+  11:00    2113 ###################
+  12:00    2681 ########################
+  13:00    3432 ##############################
+  14:00    5510 #################################################
+  15:00    6361 ########################################################
+  16:00    5040 ############################################
+  17:00    3043 ###########################
+  18:00    2423 #####################
+  19:00    2083 ##################
+  20:00    1881 #################
+  21:00    1906 #################
+  22:00    2034 ##################
+  23:00    1822 ################
+  weekday: Mon 6445  Tue 6052  Wed 7352  Thu 11906  Fri 19827  Sat 4745  Sun 5388
+
+--- TIME FROM BUY FILL TO MARKET END -------------------------------------------
+  no up/down slug pattern matched
+
+--- MARKET MIX -------------------------------------------------------------------
+  other: Bitcoin/Monthly           fills     8470  volume     $9.74M (18.8%)
+  other: Bitcoin/Weekly            fills    11800  volume     $9.05M (17.5%)
+  other: Ethereum/Monthly          fills     4347  volume     $4.68M (9.0%)
+  other: Solana/Monthly            fills     2852  volume     $3.25M (6.3%)
+  other: Crypto/Crypto Prices      fills     2616  volume     $2.90M (5.6%)
+  other: Ethereum/Weekly           fills     3667  volume     $2.76M (5.3%)
+  other: what                      fills     4998  volume     $2.38M (4.6%)
+  other: ethereum                  fills     4945  volume     $2.20M (4.2%)
+  other: XRP/Ripple                fills     2305  volume     $2.19M (4.2%)
+  other: Ethereum/Hit Price        fills     1583  volume     $2.04M (3.9%)
+  other: Bitcoin/Yearly            fills     1826  volume     $1.75M (3.4%)
+  other: bitcoin                   fills     3345  volume     $1.55M (3.0%)
+  closed-position PnL by category:
+    other: Bitcoin/Monthly           n=    318  pnl    $632.1K  win 53.8%
+    other: Ethereum/Monthly          n=    250  pnl    $480.9K  win 53.6%
+    other: Ethereum/Hit Price        n=     43  pnl    $433.3K  win 72.1%
+    other: Bitcoin/Weekly            n=    534  pnl    $378.7K  win 49.4%
+    other: Solana/Monthly            n=    174  pnl    $278.0K  win 60.9%
+    other: Crypto/Crypto Prices      n=    123  pnl    $199.3K  win 55.3%
+    other: Ethereum/Weekly           n=    206  pnl    $167.6K  win 50.5%
+    other: Bitcoin/Yearly            n=     34  pnl    $155.1K  win 61.8%
+    other: Crypto/Recurring          n=     16  pnl     $98.1K  win 75.0%
+    other: Bitcoin/Crypto Prices     n=     28  pnl     $91.9K  win 53.6%
+  distinct events             : 343
+  top 8 events by volume:
+      4.3%     $2.21M  fills   1182  what-price-will-bitcoin-hit-in-february-2026
+      3.4%     $1.76M  fills   1166  what-price-will-bitcoin-hit-in-2025
+      3.4%     $1.75M  fills   1826  what-price-will-bitcoin-hit-before-2027
+      3.1%     $1.63M  fills   1248  what-price-will-bitcoin-hit-in-january-2026
+      2.4%     $1.22M  fills    991  what-price-will-ethereum-hit-before-2027
+      2.0%     $1.01M  fills    623  what-price-will-bitcoin-hit-in-november-2025
+      1.9%    $976.2K  fills    681  what-price-will-bitcoin-hit-in-march-2026
+      1.7%    $871.6K  fills    505  what-price-will-ethereum-hit-in-november-2025
+  top-3 / top-10 event share  : 11.0% / 25.3%
+
+--- CLOSED POSITIONS: TOKEN LEVEL -----------------------------------------------
+  closed token positions      : 3914
+  win rate (pnl>0)            : 47.5%  (1858W / 2056L)
+  total realized PnL          : $2.89M
+  avg / median win            : $3.3K / $366
+  avg / median loss           : $-1.6K / $-485
+  profit factor               : 1.88
+  ROI per token               : p25 -100.0%  median -2.5%  p75 63.7%  p90 1386.6%
+  PnL per share               : median $-0.01  p10 $-0.16  p90 $0.24
+  hold hours (first->last)    : median 98.6  p25 36.6  p75 217.3  p90 644.8
+  hold buckets                : <2m 1%  2-5m 0%  5-60m 1%  1-6h 5%  6-24h 11%  1-7d 55%  >7d 27%
+  dust positions (|PnL|<$1)   : 60 (1.5%)
+  best 5:
+       $147.8K  Yes   0.405  Will Ethereum dip to $2,600 in January?
+       $103.7K  Yes   0.355  Will Bitcoin dip to $85,000 in January?
+        $98.1K  Yes   0.364  Will Ethereum dip to $1,750 by December 31, 2026
+        $91.3K  Yes   0.486  Will Ethereum dip to $2,250 by December 31, 2026
+        $81.5K  Yes   0.691  Will Bitcoin dip to $80,000 in January?
+  worst 5:
+       $-44.9K  Yes   0.425  Will Bitcoin reach $85,000 in October?
+       $-41.3K  Yes   0.966  Will the price of XRP be above $1.10 on June 5?
+       $-34.5K  Yes   0.223  Will Ethereum dip to $1,800 in March?
+       $-30.7K  No    0.898  Will Solana dip to $100 in January?
+       $-30.3K  No    0.241  Will the price of Ethereum be above $2,900 on Ja
+
+--- CLOSED POSITIONS: MARKET LEVEL (all history) ---------------------------------
+  distinct markets            : 2923
+  markets with both outcomes  : 991 (33.9%)
+  net PnL per market          : median $-31  p10 $-2.3K  p90 $4.4K  min $-44.9K  max $146.5K
+  profitable markets          : 46.3%   total $2.89M
+  combined avg price (both)   : p10 0.7991  median 1.0172  p90 1.2084
+    combined < 0.95          : 20.9%
+    combined < 0.98          : 26.0%
+    combined < 0.99          : 28.3%
+    combined < 1.0           : 35.4%
+    combined < 1.01          : 44.7%
+  market PnL by combined price bucket:
+    <0.95     n=    207  PnL     $593.2K  avg $2.9K/market
+    0.95-0.98 n=     51  PnL     $-34.6K  avg $-679/market
+    0.98-1.00 n=     93  PnL      $56.4K  avg $607/market
+    1.00-1.02 n=    166  PnL     $-19.2K  avg $-115/market
+    >1.02     n=    474  PnL     $696.2K  avg $1.5K/market
+  monthly PnL by position close month:
+    2025-12:$31.5K  2026-01:$685.3K  2026-02:$146.6K  2026-03:$158.3K  2026-04:$-73.3K  2026-05:$-23.3K  2026-06:$31.9K  2026-07:$-37.7K  2026-08:$468.0K  2026-09:$108.2K  2026-10:$133.4K  2026-11:$303.1K
+
+--- OPEN BOOK -----------------------------------------------------------------------
+  open         n= 184  current    $1.14M  cost    $1.15M  unrealized    $-2.1K
+  redeemable   n=   0  current     $0.00  cost     $0.00  unrealized     $0.00
+  mergeable    n=   0  current     $0.00  cost     $0.00  unrealized     $0.00
+  total unrealized PnL        : $-2.1K
+  redeemable value (unclaimed): $0.00   mergeable $0.00
+  largest open positions:
+       $75.9K  avg 0.904 -> 0.755  No    Will Ethereum dip to $1,250 by December 31
+       $55.8K  avg 0.925 -> 0.987  No    Bitcoin all time high by December 31, 2026
+       $49.1K  avg 0.885 -> 0.990  No    Will Bitcoin reach $120,000 by December 31
+       $41.6K  avg 0.919 -> 0.902  No    Will Bitcoin dip to $50,000 in November?
+       $36.9K  avg 0.975 -> 0.998  No    Will Solana reach $600 by December 31, 202
+       $32.2K  avg 0.684 -> 0.535  Yes   Will Bitcoin dip to $55,000 by December 31
+       $31.3K  avg 0.754 -> 0.985  No    Will Ethereum reach $3,500 by December 31,
+       $29.6K  avg 0.970 -> 0.973  No    Will Ethereum reach $2,600 in November?
+
+--- MAKER / TAKER & FEES --------------------------------------------------------
+  last 24h fills              : all 183  taker 183  maker 0 (0.0%)
+  fees paid (all time)        : $-305.6K
+  maker + taker rebates       : $66.5K
+  rewards                     : $0.00
+  fees / volume               : -0.276%
+  rebates / volume            : 0.060%
+
+--- COPY-TRADE RELEVANT NUMBERS --------------------------------------------------
+  median fill notional        : $177    p90 $2.4K
+  fills < $100 / < $500       : 40.8% / 67.6%
+  median fills / active day   : 106
+  top-3 event volume share    : 11.0%
+  median hold                 : 98.57 h
+  median fills per market     : 10
+  open book value             : $1.14M  (plus redeemable $0.00)
+  last trade                  : 2026-11-23 02:20

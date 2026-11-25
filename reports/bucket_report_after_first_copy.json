@@ -1,0 +1,234 @@
+{
+  "data-api": {
+    "path": "/root/polycopy/data/paper_f705.db",
+    "stats": {
+      "<30c": {
+        "signals": 29,
+        "copied": 0,
+        "skip_reasons": {
+          "price_out_of_range": 29
+        },
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": null,
+        "net_after_median_c": null
+      },
+      "30-50c": {
+        "signals": 1,
+        "copied": 1,
+        "skip_reasons": {},
+        "slip_median_c": 2.2527806919324656,
+        "slip_mean_c": 2.2527806919324656,
+        "slip_p90_c": 2.2527806919324656,
+        "slip_max_c": 2.2527806919324656,
+        "fee_median_c": 1.6182438457581223,
+        "notional": 10.085755122770914,
+        "edge_budget_c": 18.3,
+        "net_after_median_c": 14.428975462309413
+      },
+      "50-60c": {
+        "signals": 1,
+        "copied": 0,
+        "skip_reasons": {
+          "drift": 1
+        },
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 12.1,
+        "net_after_median_c": null
+      },
+      "60-70c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 6.1,
+        "net_after_median_c": null
+      },
+      ">70c": {
+        "signals": 6,
+        "copied": 2,
+        "skip_reasons": {
+          "price_out_of_range": 4
+        },
+        "slip_median_c": 0.16523045999999875,
+        "slip_mean_c": 0.4391932899999951,
+        "slip_p90_c": 0.7131561199999914,
+        "slip_max_c": 0.7131561199999914,
+        "fee_median_c": 0.040236000000000036,
+        "notional": 41.61469918588149,
+        "edge_budget_c": null,
+        "net_after_median_c": null
+      },
+      "_sells": {
+        "copied": 0,
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null
+      }
+    },
+    "exposure": {
+      "samples": 170,
+      "first_ts": 1795433932,
+      "last_ts": 1795444073,
+      "max_open_positions": 3,
+      "median_open_positions": 2.0,
+      "max_invested": 52.177318,
+      "median_invested": 41.641702,
+      "max_cash_utilization": 0.005218,
+      "median_cash_utilization": 0.004164,
+      "max_market_exposure": 35.445037,
+      "equity_peak": 10000.657162,
+      "equity_trough": 9999.478956,
+      "max_drawdown_pct": 0.011684163511159081,
+      "current": {
+        "ts": 1795444073,
+        "source": "data-api",
+        "db": "/root/polycopy/data/paper_f705.db",
+        "open_positions": 3,
+        "open_conditions": 3,
+        "invested": 52.177318,
+        "market_value": 52.83448,
+        "cash": 9947.822682,
+        "equity": 10000.657162,
+        "realized_pnl": 0.0,
+        "fees_paid": 0.476863,
+        "unrealized_pnl": 0.657162,
+        "cash_utilization": 0.005217,
+        "max_market_exposure": 35.445037,
+        "max_market_condition": "0x2d3883a6e9105c36eb803f85f00afcf3144246b086b0f30bb5000c0b646a913b",
+        "signals": 55,
+        "copied_signals": 3
+      }
+    }
+  },
+  "onchain": {
+    "path": "/root/polycopy-onchain/data/paper_f705_onchain.db",
+    "stats": {
+      "<30c": {
+        "signals": 24,
+        "copied": 0,
+        "skip_reasons": {
+          "price_out_of_range": 24
+        },
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": null,
+        "net_after_median_c": null
+      },
+      "30-50c": {
+        "signals": 1,
+        "copied": 1,
+        "skip_reasons": {},
+        "slip_median_c": 1.5426918445098192,
+        "slip_mean_c": 1.5426918445098192,
+        "slip_p90_c": 1.5426918445098192,
+        "slip_max_c": 1.5426918445098192,
+        "fee_median_c": 1.604252055987884,
+        "notional": 9.888355122770914,
+        "edge_budget_c": 18.3,
+        "net_after_median_c": 15.1530560995023
+      },
+      "50-60c": {
+        "signals": 1,
+        "copied": 0,
+        "skip_reasons": {
+          "drift": 1
+        },
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 12.1,
+        "net_after_median_c": null
+      },
+      "60-70c": {
+        "signals": 0,
+        "copied": 0,
+        "skip_reasons": {},
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": 6.1,
+        "net_after_median_c": null
+      },
+      ">70c": {
+        "signals": 4,
+        "copied": 0,
+        "skip_reasons": {
+          "price_out_of_range": 4
+        },
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null,
+        "slip_max_c": null,
+        "fee_median_c": null,
+        "notional": 0,
+        "edge_budget_c": null,
+        "net_after_median_c": null
+      },
+      "_sells": {
+        "copied": 0,
+        "slip_median_c": null,
+        "slip_mean_c": null,
+        "slip_p90_c": null
+      }
+    },
+    "exposure": {
+      "samples": 170,
+      "first_ts": 1795433932,
+      "last_ts": 1795444073,
+      "max_open_positions": 1,
+      "median_open_positions": 0.0,
+      "max_invested": 10.334327,
+      "median_invested": 0.0,
+      "max_cash_utilization": 0.001033,
+      "median_cash_utilization": 0.0,
+      "max_market_exposure": 10.334327,
+      "equity_peak": 10003.843336,
+      "equity_trough": 9999.812432,
+      "max_drawdown_pct": 0.0018756799999937357,
+      "current": {
+        "ts": 1795444073,
+        "source": "onchain",
+        "db": "/root/polycopy-onchain/data/paper_f705_onchain.db",
+        "open_positions": 1,
+        "open_conditions": 1,
+        "invested": 10.334327,
+        "market_value": 14.177662,
+        "cash": 9989.665673,
+        "equity": 10003.843336,
+        "realized_pnl": 0.0,
+        "fees_paid": 0.445971,
+        "unrealized_pnl": 3.843336,
+        "cash_utilization": 0.001033,
+        "max_market_exposure": 10.334327,
+        "max_market_condition": "0x215898981a482d275f91f8f9523f9cf7d582be172557e0c953f265a54936878a",
+        "signals": 35,
+        "copied_signals": 1
+      }
+    }
+  }
+}

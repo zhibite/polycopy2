@@ -54,6 +54,45 @@ class StoreTest(unittest.TestCase):
         self.store.add_target_shares("t", "c", "k", -100)
         self.assertAlmostEqual(self.store.target_shares("t", "k"), 0)
 
+    def test_pending_exit_caps_and_clears(self):
+        self.store.apply_buy(
+            ts=1, target="t", signal_id=None, condition_id="c", token_id="k",
+            outcome="Yes", title="m", event_slug="e", shares=10, price=0.5,
+            fee=0.0,
+        )
+        self.store.queue_pending_exit(
+            target="t", condition_id="c", token_id="k", outcome="Yes",
+            shares=4, reason="target_flat", ts=2,
+        )
+        self.assertAlmostEqual(
+            self.store.pending_exit("t", "c", "k")["shares"], 4)
+        # A second target exit is additive but capped at the held shares.
+        self.store.queue_pending_exit(
+            target="t", condition_id="c", token_id="k", outcome="Yes",
+            shares=8, reason="partial_exit", ts=3,
+        )
+        self.assertAlmostEqual(
+            self.store.pending_exit("t", "c", "k")["shares"], 10)
+
+        result = self.store.apply_sell(
+            ts=4, target="t", signal_id=None, condition_id="c", token_id="k",
+            outcome="Yes", shares=10, price=0.4, fee=0.01, note="strict_exit",
+        )
+        self.assertIsNotNone(result)
+        self.assertIsNone(self.store.pending_exit("t", "c", "k"))
+        self.assertEqual(self.store.recent_fills(1)[0]["note"], "strict_exit")
+
+    def test_replace_target_positions(self):
+        self.store.add_target_shares("t", "c1", "k1", 100)
+        self.store.add_target_shares("t", "c2", "k2", 50)
+        updated = self.store.replace_target_positions(
+            "t", [("c1", "k1", 70.0), ("c3", "k3", 10.0)], ts=10,
+        )
+        self.assertEqual(updated, 2)
+        self.assertAlmostEqual(self.store.target_shares("t", "k1"), 70.0)
+        self.assertEqual(self.store.target_shares("t", "k2"), 0.0)
+        self.assertAlmostEqual(self.store.target_shares("t", "k3"), 10.0)
+
     def test_market_exposure(self):
         self.store.apply_buy(
             ts=1, target="t", signal_id=None, condition_id="c", token_id="k",
@@ -61,6 +100,42 @@ class StoreTest(unittest.TestCase):
             fee=0.0,
         )
         self.assertAlmostEqual(self.store.market_exposure("c"), 5.0)
+
+    def test_order_intent_is_idempotent(self):
+        first = self.store.create_order(
+            dedupe_key="d1", target="t", mode="live", side="BUY",
+            condition_id="c", token_id="k", outcome="Yes",
+            limit_price=0.5, size=10, fee_rate=0.01, ts=1,
+        )
+        second = self.store.create_order(
+            dedupe_key="d1", target="t", mode="live", side="BUY",
+            condition_id="c", token_id="k", outcome="Yes",
+            limit_price=0.5, size=10, fee_rate=0.01, ts=2,
+        )
+        self.assertEqual(first["id"], second["id"])
+        self.assertEqual(first["status"], "INTENT")
+        self.store.update_order(first["id"], status="FILLED",
+                                filled_size=10, avg_price=0.5, ts=3)
+        self.store.commit()
+        order = self.store.order_for("d1", "BUY")
+        self.assertEqual(order["status"], "FILLED")
+        self.assertAlmostEqual(order["filled_size"], 10.0)
+        self.assertAlmostEqual(order["fee_rate"], 0.01)
+
+    def test_fill_order_link_and_realized_pnl_since(self):
+        self.store.apply_buy(
+            ts=10, target="t", signal_id=None, condition_id="c",
+            token_id="k", outcome="Yes", title="m", event_slug="e",
+            shares=10, price=0.5, fee=0.0, order_id=7,
+        )
+        self.store.apply_sell(
+            ts=20, target="t", signal_id=None, condition_id="c",
+            token_id="k", outcome="Yes", shares=10, price=0.6, fee=0.0,
+            order_id=8,
+        )
+        fills = self.store.recent_fills(2)
+        self.assertEqual({f["order_id"] for f in fills}, {7, 8})
+        self.assertAlmostEqual(self.store.realized_pnl_since(15), 1.0)
 
 
 if __name__ == "__main__":

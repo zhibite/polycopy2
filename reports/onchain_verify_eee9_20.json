@@ -1,0 +1,623 @@
+{
+  "wallet": "0xeee92f1cc6d6e0ad0b4ffda20b01cf3678e27ecb",
+  "generated_at": 1795429643,
+  "lookback_seconds": 3600,
+  "requested": 20,
+  "data_api_trades": 20,
+  "transactions": 18,
+  "receipts": 18,
+  "own_order_events": 20,
+  "matched": 20,
+  "passed": 20,
+  "failed": 0,
+  "max_abs_size_diff": 0.0,
+  "max_abs_price_diff": 4.650156648633441e-11,
+  "max_abs_usdc_diff": 0.0,
+  "timestamp_mismatches": 0,
+  "condition_mismatches": 0,
+  "unmatched_rows": 0,
+  "unmatched_events": 0,
+  "checks": [
+    {
+      "tx": "0x41627687eb337cee7f696916dfb293e872287a387e1044cee85599fe7553a77c",
+      "side": "BUY",
+      "size": 8.032257,
+      "price": 0.3800000423,
+      "usdc_size": 3.052258,
+      "timestamp": 1795429531,
+      "token_id": "81451605441572991383340833512189469311355966702200327652291729833671669071643",
+      "condition_id": "0x560f02ea9d5d71abdf682277d3a710f04612936b1970854b243f9ae305978110",
+      "matched_log_index": 340,
+      "block_number": 97816041,
+      "block_ts": 1795429531,
+      "decoded": {
+        "side": "BUY",
+        "size": 8.032257,
+        "price": 0.3800000423293229,
+        "usdc_size": 3.052258,
+        "gross_usd": 3.052258,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 2.932287745949225e-11,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x5da7e5c0818de3f6460d9415e64967bf69048b42e3ae5b299ddee406eaf6550b",
+      "side": "BUY",
+      "size": 8.032257,
+      "price": 0.3800000423,
+      "usdc_size": 3.052258,
+      "timestamp": 1795429531,
+      "token_id": "81451605441572991383340833512189469311355966702200327652291729833671669071643",
+      "condition_id": "0x560f02ea9d5d71abdf682277d3a710f04612936b1970854b243f9ae305978110",
+      "matched_log_index": 61,
+      "block_number": 97816041,
+      "block_ts": 1795429531,
+      "decoded": {
+        "side": "BUY",
+        "size": 8.032257,
+        "price": 0.3800000423293229,
+        "usdc_size": 3.052258,
+        "gross_usd": 3.052258,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 2.932287745949225e-11,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x5c2bf2df30446accf0ff312bf0a93c08aafc6ef86ae65984789dea426010dbf7",
+      "side": "BUY",
+      "size": 139.9,
+      "price": 0.82,
+      "usdc_size": 114.92449,
+      "timestamp": 1795429489,
+      "token_id": "47659540599398736994373163595323802519025973368306636910348417632738672785392",
+      "condition_id": "0xb6fe6809e88930da3ad5d660f5e3c018339d2204d97876738825917f81d156f9",
+      "matched_log_index": 306,
+      "block_number": 97816013,
+      "block_ts": 1795429489,
+      "decoded": {
+        "side": "BUY",
+        "size": 139.9,
+        "price": 0.82,
+        "usdc_size": 114.92449,
+        "gross_usd": 114.718,
+        "fee_usd": 0.20649
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0xf797655f6b1f2372ce59b6bb8f6d5becb36d1fb33c22361eac2a6bacf2b57b07",
+      "side": "SELL",
+      "size": 1.53,
+      "price": 0.19,
+      "usdc_size": 0.2907,
+      "timestamp": 1795429250,
+      "token_id": "93099822075127674436771368181179555856299915455807044158567239154472844539127",
+      "condition_id": "0xb6fe6809e88930da3ad5d660f5e3c018339d2204d97876738825917f81d156f9",
+      "matched_log_index": 59,
+      "block_number": 97815854,
+      "block_ts": 1795429250,
+      "decoded": {
+        "side": "SELL",
+        "size": 1.53,
+        "price": 0.19,
+        "usdc_size": 0.2907,
+        "gross_usd": 0.2907,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x525befe68c522067b9d303510ea5fc1365731fc3e161b9c158ba5bbc2198e407",
+      "side": "BUY",
+      "size": 193.09,
+      "price": 0.988,
+      "usdc_size": 190.77292,
+      "timestamp": 1795429226,
+      "token_id": "39669409362817873116461441233029460134202079993918269831938674303862549463454",
+      "condition_id": "0xb7d2ce93fae20ac15eb982a266ab09479243c35231c11bfb5a2f1a0e50874ee9",
+      "matched_log_index": 120,
+      "block_number": 97815838,
+      "block_ts": 1795429226,
+      "decoded": {
+        "side": "BUY",
+        "size": 193.09,
+        "price": 0.988,
+        "usdc_size": 190.77292,
+        "gross_usd": 190.77292,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x525befe68c522067b9d303510ea5fc1365731fc3e161b9c158ba5bbc2198e407",
+      "side": "BUY",
+      "size": 214.0,
+      "price": 0.989,
+      "usdc_size": 211.646,
+      "timestamp": 1795429226,
+      "token_id": "39669409362817873116461441233029460134202079993918269831938674303862549463454",
+      "condition_id": "0xb7d2ce93fae20ac15eb982a266ab09479243c35231c11bfb5a2f1a0e50874ee9",
+      "matched_log_index": 116,
+      "block_number": 97815838,
+      "block_ts": 1795429226,
+      "decoded": {
+        "side": "BUY",
+        "size": 214.0,
+        "price": 0.989,
+        "usdc_size": 211.646,
+        "gross_usd": 211.646,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x22f4d6a4644a0a40a482334d43389809f13b16e46131b4bd8da9287ec5280f39",
+      "side": "BUY",
+      "size": 11.123465,
+      "price": 0.1010000031,
+      "usdc_size": 1.12347,
+      "timestamp": 1795429223,
+      "token_id": "85261076601386091224766009018397343399798792243652156000242864517919596115933",
+      "condition_id": "0x4b53c299653f4c5af7cce448734f003b00bf2036258f1ccd19a6599c07848102",
+      "matched_log_index": 274,
+      "block_number": 97815836,
+      "block_ts": 1795429223,
+      "decoded": {
+        "side": "BUY",
+        "size": 11.123465,
+        "price": 0.10100000314650157,
+        "usdc_size": 1.12347,
+        "gross_usd": 1.12347,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 4.650156648633441e-11,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x098d27b18999f4a2072059e134931d363ab2d13898652dc6b169e3f463b136c1",
+      "side": "BUY",
+      "size": 22.0,
+      "price": 0.696,
+      "usdc_size": 15.312,
+      "timestamp": 1795429027,
+      "token_id": "58602249613307397287296293055092328730724094006673182473353518822568921101167",
+      "condition_id": "0x036aca99fb6fc84b2de0d327f5c9ada11b5dbba87158b71226e18c5f8309045f",
+      "matched_log_index": 451,
+      "block_number": 97815705,
+      "block_ts": 1795429027,
+      "decoded": {
+        "side": "BUY",
+        "size": 22.0,
+        "price": 0.696,
+        "usdc_size": 15.312,
+        "gross_usd": 15.312,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x981972e0c8111552a383e5435be49987583f0782a143393b509274043b7ef5a6",
+      "side": "SELL",
+      "size": 105.05,
+      "price": 0.966,
+      "usdc_size": 101.4783,
+      "timestamp": 1795428988,
+      "token_id": "85004320037810974632511857212416307320817469819343609593099749034548225561275",
+      "condition_id": "0x62bcf17f6f53a149efbc7f9785a4f475e496001dc32d29f7322ab1c7b748e2eb",
+      "matched_log_index": 233,
+      "block_number": 97815679,
+      "block_ts": 1795428988,
+      "decoded": {
+        "side": "SELL",
+        "size": 105.05,
+        "price": 0.966,
+        "usdc_size": 101.4783,
+        "gross_usd": 101.4783,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0xea111ba9b1d1c3a282500356c60777d65b1fbdedb39d038ab1fb57a0443cec98",
+      "side": "BUY",
+      "size": 25.641026,
+      "price": 0.9610000005,
+      "usdc_size": 24.641026,
+      "timestamp": 1795428854,
+      "token_id": "85004320037810974632511857212416307320817469819343609593099749034548225561275",
+      "condition_id": "0x62bcf17f6f53a149efbc7f9785a4f475e496001dc32d29f7322ab1c7b748e2eb",
+      "matched_log_index": 577,
+      "block_number": 97815590,
+      "block_ts": 1795428854,
+      "decoded": {
+        "side": "BUY",
+        "size": 25.641026,
+        "price": 0.961000000546,
+        "usdc_size": 24.641026,
+        "gross_usd": 24.641026,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 4.5999981601596573e-11,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0xf5e908120d47386e445b6494cb6ffea9adfb78729636de7ee3efcb38a206e913",
+      "side": "SELL",
+      "size": 172.49,
+      "price": 0.992,
+      "usdc_size": 171.11008,
+      "timestamp": 1795428824,
+      "token_id": "73420773700409532110517942946413432475881796609339418992664545826626403080606",
+      "condition_id": "0x870761dd113ba25e31b9d717495268b113ac86146eabd19cd92a197060c1f1dc",
+      "matched_log_index": 489,
+      "block_number": 97815570,
+      "block_ts": 1795428824,
+      "decoded": {
+        "side": "SELL",
+        "size": 172.49,
+        "price": 0.992,
+        "usdc_size": 171.11008,
+        "gross_usd": 171.11008,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x26c65023f1077276ee5a0806f1323a19cacbdc1b60a918f31ac425d03a98de61",
+      "side": "BUY",
+      "size": 8.88,
+      "price": 0.298,
+      "usdc_size": 2.64624,
+      "timestamp": 1795428649,
+      "token_id": "90478448854050815598117782199528124266207059209999731466403180932787204279568",
+      "condition_id": "0x036aca99fb6fc84b2de0d327f5c9ada11b5dbba87158b71226e18c5f8309045f",
+      "matched_log_index": 516,
+      "block_number": 97815453,
+      "block_ts": 1795428649,
+      "decoded": {
+        "side": "BUY",
+        "size": 8.88,
+        "price": 0.298,
+        "usdc_size": 2.64624,
+        "gross_usd": 2.64624,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0xec0e53102bc1f0dbaf4695f437fcad13e6479a6db5e838fd5a74f4317be67473",
+      "side": "BUY",
+      "size": 47.0,
+      "price": 0.12,
+      "usdc_size": 5.64,
+      "timestamp": 1795428628,
+      "token_id": "55489559560675546629793228626457242375762819427936092549013030593732264149412",
+      "condition_id": "0xded136aef891fcc3f35235a6b25cab156b36428086afa264ebbb80d6619c91f1",
+      "matched_log_index": 163,
+      "block_number": 97815439,
+      "block_ts": 1795428628,
+      "decoded": {
+        "side": "BUY",
+        "size": 47.0,
+        "price": 0.12,
+        "usdc_size": 5.64,
+        "gross_usd": 5.64,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x70fdaa86b8d1328d6b55215d23e5cb86d3bf7007c8d767af9c377491fd75a9a1",
+      "side": "SELL",
+      "size": 4.98992,
+      "price": 0.9919998717,
+      "usdc_size": 4.95,
+      "timestamp": 1795428592,
+      "token_id": "73420773700409532110517942946413432475881796609339418992664545826626403080606",
+      "condition_id": "0x870761dd113ba25e31b9d717495268b113ac86146eabd19cd92a197060c1f1dc",
+      "matched_log_index": 363,
+      "block_number": 97815415,
+      "block_ts": 1795428592,
+      "decoded": {
+        "side": "SELL",
+        "size": 4.98992,
+        "price": 0.9919998717414307,
+        "usdc_size": 4.95,
+        "gross_usd": 4.95,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 4.1430636699146817e-11,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x5751e7bd95d4245a1a0f91f2d0d789ba2971fd9e644a9fd0fd823b70b24841da",
+      "side": "SELL",
+      "size": 36.512097,
+      "price": 0.9919999939,
+      "usdc_size": 36.22,
+      "timestamp": 1795428592,
+      "token_id": "73420773700409532110517942946413432475881796609339418992664545826626403080606",
+      "condition_id": "0x870761dd113ba25e31b9d717495268b113ac86146eabd19cd92a197060c1f1dc",
+      "matched_log_index": 265,
+      "block_number": 97815415,
+      "block_ts": 1795428592,
+      "decoded": {
+        "side": "SELL",
+        "size": 36.512097,
+        "price": 0.991999993865047,
+        "usdc_size": 36.22,
+        "gross_usd": 36.22,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": -3.495304046197134e-11,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0xd0f93e31f83e9579fc1c3ca434e9924a5946dfce9f718de52d9867111f04952c",
+      "side": "BUY",
+      "size": 138.683077,
+      "price": 0.987,
+      "usdc_size": 136.880197,
+      "timestamp": 1795428592,
+      "token_id": "73420773700409532110517942946413432475881796609339418992664545826626403080606",
+      "condition_id": "0x870761dd113ba25e31b9d717495268b113ac86146eabd19cd92a197060c1f1dc",
+      "matched_log_index": 96,
+      "block_number": 97815415,
+      "block_ts": 1795428592,
+      "decoded": {
+        "side": "BUY",
+        "size": 138.683077,
+        "price": 0.9870000000072107,
+        "usdc_size": 136.880197,
+        "gross_usd": 136.880197,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 7.210676500335467e-12,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0xd0f93e31f83e9579fc1c3ca434e9924a5946dfce9f718de52d9867111f04952c",
+      "side": "BUY",
+      "size": 214.0,
+      "price": 0.989,
+      "usdc_size": 211.646,
+      "timestamp": 1795428592,
+      "token_id": "73420773700409532110517942946413432475881796609339418992664545826626403080606",
+      "condition_id": "0x870761dd113ba25e31b9d717495268b113ac86146eabd19cd92a197060c1f1dc",
+      "matched_log_index": 88,
+      "block_number": 97815415,
+      "block_ts": 1795428592,
+      "decoded": {
+        "side": "BUY",
+        "size": 214.0,
+        "price": 0.989,
+        "usdc_size": 211.646,
+        "gross_usd": 211.646,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x2dc0e3839bfcd8926ad45df26c99ee7b77c4b9c8aa7a57a6429bc1150da70a1e",
+      "side": "BUY",
+      "size": 214.0,
+      "price": 0.954,
+      "usdc_size": 204.156,
+      "timestamp": 1795428584,
+      "token_id": "85004320037810974632511857212416307320817469819343609593099749034548225561275",
+      "condition_id": "0x62bcf17f6f53a149efbc7f9785a4f475e496001dc32d29f7322ab1c7b748e2eb",
+      "matched_log_index": 114,
+      "block_number": 97815410,
+      "block_ts": 1795428584,
+      "decoded": {
+        "side": "BUY",
+        "size": 214.0,
+        "price": 0.954,
+        "usdc_size": 204.156,
+        "gross_usd": 204.156,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0xefa31cce75b24a508cbdf4f54aeabd97c7a8880abf0c28c01f4c7c7d68f2817d",
+      "side": "BUY",
+      "size": 6.11,
+      "price": 0.989,
+      "usdc_size": 6.04279,
+      "timestamp": 1795428508,
+      "token_id": "112640187121872104723655834799934821712465419714201363140089615513884600316497",
+      "condition_id": "0x885a6abefad122348b4fbd503473d7fd1f9035d0438cf988a7591620f316a859",
+      "matched_log_index": 616,
+      "block_number": 97815359,
+      "block_ts": 1795428508,
+      "decoded": {
+        "side": "BUY",
+        "size": 6.11,
+        "price": 0.989,
+        "usdc_size": 6.04279,
+        "gross_usd": 6.04279,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    },
+    {
+      "tx": "0x93cc521a806830d06bf9804a666d34f81d3dacb23f7f5f03204051b4fc6f9815",
+      "side": "BUY",
+      "size": 10.0,
+      "price": 0.103,
+      "usdc_size": 1.03,
+      "timestamp": 1795428485,
+      "token_id": "85261076601386091224766009018397343399798792243652156000242864517919596115933",
+      "condition_id": "0x4b53c299653f4c5af7cce448734f003b00bf2036258f1ccd19a6599c07848102",
+      "matched_log_index": 252,
+      "block_number": 97815344,
+      "block_ts": 1795428485,
+      "decoded": {
+        "side": "BUY",
+        "size": 10.0,
+        "price": 0.103,
+        "usdc_size": 1.03,
+        "gross_usd": 1.03,
+        "fee_usd": 0.0
+      },
+      "diffs": {
+        "size": 0.0,
+        "price": 0.0,
+        "usdc_size": 0.0,
+        "timestamp": 0
+      },
+      "condition_matches": true,
+      "ok": true,
+      "error": null
+    }
+  ],
+  "unmatched_event_details": []
+}

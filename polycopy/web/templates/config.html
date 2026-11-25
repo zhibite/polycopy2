@@ -5,7 +5,7 @@
 <div class="page-head">
   <div>
     <h1>策略配置</h1>
-    <div class="page-sub">保存后引擎会在下一次轮询时自动热加载，无需重启</div>
+    <div class="page-sub">策略参数热加载；运行模式与实盘设置需要重启 bot 才生效</div>
   </div>
   <div class="head-meta">
     配置文件：<span class="mono">{{ config_path }}</span><br>
@@ -14,7 +14,11 @@
 </div>
 
 {% if saved %}
-  <div class="alert ok">配置已保存。引擎将在约 {{ cfg.paper.poll_seconds }} 秒内自动生效。</div>
+  {% if mode_changed %}
+    <div class="alert warn">配置已保存。运行模式或实盘设置已变更，需要重启 bot 才会生效；重启前仍按旧模式运行。</div>
+  {% else %}
+    <div class="alert ok">配置已保存。策略参数将在约 {{ cfg.paper.poll_seconds }} 秒内自动生效。</div>
+  {% endif %}
 {% endif %}
 {% if error %}
   <div class="alert warn">保存失败：{{ error }}</div>
@@ -23,6 +27,119 @@
 <div class="alert info">
   这里只调整跟单策略参数。数据库路径、日志路径、目标钱包地址不在此页修改。
   带 <b>热加载</b> 的字段保存后由引擎自动读取；账户初始资金只在建库时生效，之后不可更改。
+  运行模式、dry-run、实盘上限与密钥变量名属于重启项。
+</div>
+
+<div class="config-group">
+  <h2><span class="dot"></span>运行模式</h2>
+  <div class="config-grid">
+    <div class="field">
+      <label>执行模式</label>
+      <select name="run.mode">
+        <option value="paper" {{ 'selected' if run.mode == 'paper' else '' }}>纸盘 paper（默认）</option>
+        <option value="live" {{ 'selected' if run.mode == 'live' else '' }}>实盘 live</option>
+      </select>
+      <div class="help">纸盘只用内部账本模拟成交；实盘通过 CLOB 提交 FAK 订单。</div>
+    </div>
+    <div class="field">
+      <label>实盘 dry-run</label>
+      <div class="switch-row">
+        <input type="checkbox" name="live.dry_run" value="1" {{ 'checked' if live.dry_run else '' }}>
+        <span class="key">live.dry_run</span>
+      </div>
+      <div class="help">开启时只记录订单意图和风控结果，不向交易所提交。首次接实盘必须保持开启。</div>
+    </div>
+    <div class="field">
+      <label>当前生效状态</label>
+      <input type="text" value="{{ run_mode }}{% if run_mode == 'live' %}{{ ' · DRY RUN' if live_dry_run else ' · 会真实下单' }}{% endif %}{% if mode_mismatch %}（配置已改为 {{ run.mode }}，待重启）{% endif %}" readonly>
+      <div class="help">显示 bot 进程实际使用的模式；配置文件中的模式以重启后为准。</div>
+    </div>
+  </div>
+</div>
+
+<div class="config-group">
+  <h2><span class="dot"></span>实盘安全设置</h2>
+  <div class="config-grid">
+    <div class="field">
+      <label>私钥环境变量名</label>
+      <input type="text" name="live.private_key_env" value="{{ live.private_key_env }}"
+             placeholder="POLY_PRIVATE_KEY">
+      <div class="help">只填变量名，私钥本身放 VPS 的 .env，绝不写进配置文件或此页面。</div>
+    </div>
+    <div class="field">
+      <label>Funder / 代理钱包</label>
+      <input type="text" name="live.funder" value="{{ live.funder }}"
+             placeholder="0x...">
+      <div class="help">实际持有 USDC/仓位、用于下单归因的代理钱包地址。</div>
+    </div>
+    <div class="field">
+      <label>签名类型</label>
+      <select name="live.signature_type">
+        <option value="0" {{ 'selected' if live.signature_type == 0 else '' }}>0 · EOA / 私钥钱包</option>
+        <option value="1" {{ 'selected' if live.signature_type == 1 else '' }}>1 · Email / Magic 代理</option>
+        <option value="2" {{ 'selected' if live.signature_type == 2 else '' }}>2 · 浏览器钱包 / Safe 代理</option>
+      </select>
+      <div class="help">用 Polymarket 网页钱包时通常是 2；新建 EOA 热钱包是 0。</div>
+    </div>
+    <div class="field">
+      <label>实盘数据库路径</label>
+      <input type="text" name="live.db_path" value="{{ live.db_path }}">
+      <div class="help">必须与纸盘库分开；切换模式后重启会使用这个库。</div>
+    </div>
+    <div class="field">
+      <label>实盘日志路径</label>
+      <input type="text" name="live.log_path" value="{{ live.log_path }}">
+    </div>
+    <div class="field">
+      <label>实盘单笔上限（USD）</label>
+      <input type="number" step="any" min="0.01" name="live.max_order_usd"
+             value="{{ live.max_order_usd }}">
+      <div class="help">在此之上仍受目标配置的单笔最大金额约束。</div>
+    </div>
+    <div class="field">
+      <label>实盘总敞口上限（USD）</label>
+      <input type="number" step="any" min="0" name="live.max_total_exposure_usd"
+             value="{{ live.max_total_exposure_usd }}">
+      <div class="help">按持仓成本计算，超过后停止新的买入。</div>
+    </div>
+    <div class="field">
+      <label>实盘日亏损上限（USD）</label>
+      <input type="number" step="any" min="0" name="live.max_daily_loss_usd"
+             value="{{ live.max_daily_loss_usd }}">
+      <div class="help">UTC 当日已实现亏损达到该值后停止买入；卖出不受影响。</div>
+    </div>
+    <div class="field">
+      <label>最小下单份额</label>
+      <input type="number" step="any" min="0" name="live.min_order_shares"
+             value="{{ live.min_order_shares }}">
+      <div class="help">Polymarket CLOB 常见最小单为 5 股；低于该值的信号跳过。</div>
+    </div>
+    <div class="field">
+      <label>盘口深度占比上限</label>
+      <input type="number" step="any" min="0" max="1" name="live.max_book_depth_pct"
+             value="{{ live.max_book_depth_pct }}">
+      <div class="help">单笔最多吃掉可见盘口深度的比例，防止大单冲击薄市场。</div>
+    </div>
+    <div class="field">
+      <label>订单等待超时（秒）</label>
+      <input type="number" step="1" min="1" max="3600" name="live.order_timeout_seconds"
+             value="{{ live.order_timeout_seconds }}">
+      <div class="help">FAK 订单查询终态的最长时间；超时后由对账流程处理。</div>
+    </div>
+    <div class="field">
+      <label>Kill switch 文件路径</label>
+      <input type="text" name="live.kill_switch_path" value="{{ live.kill_switch_path }}">
+      <div class="help">该文件存在时停止新的实盘买入；卖出仍允许。可用 SSH touch 立即触发。</div>
+    </div>
+    <div class="field">
+      <label>自动赎回</label>
+      <div class="switch-row">
+        <input type="checkbox" name="live.redeem" value="1" {{ 'checked' if live.redeem else '' }}>
+        <span class="key">live.redeem</span>
+      </div>
+      <div class="help">市场结算后尝试通过 SDK 赎回；失败则保留为可领取。</div>
+    </div>
+  </div>
 </div>
 
 <form method="post" action="/config">

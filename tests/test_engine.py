@@ -1,11 +1,15 @@
+import copy
 import os
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 from polycopy.config import AccountConfig, AppConfig, PaperConfig, TargetConfig
 from polycopy.engine import Engine
+from polycopy.execution import ExecutionResult, Fill, PaperExecutor
 from polycopy.store import Store
+from polycopy.web import config_io
 
 
 class FakeData:
@@ -14,6 +18,10 @@ class FakeData:
 
     def activity(self, user, start_ts, limit=500, max_pages=3):
         return list(self.rows)
+
+    def open_positions(self, user, limit=500, max_pages=10):
+        # Disable ledger reconciliation unless a test opts in.
+        return None
 
 
 class FakeClob:
@@ -26,6 +34,15 @@ class FakeClob:
             "bids": [{"price": str(self.bid), "size": "1000"}],
             "asks": [{"price": str(self.ask), "size": "1000"}],
         }
+
+
+class MutableClob(FakeClob):
+    fail = False
+
+    def book(self, token):
+        if self.fail:
+            return None
+        return super().book(token)
 
 
 class FakeGamma:
@@ -68,8 +85,37 @@ def trade_row(side, size, price, ts, tx="0x1"):
     }
 
 
+class FakeExecutor:
+    is_live = False
+    min_shares = 1.0
+
+    def __init__(self):
+        self.buys = []
+        self.sells = []
+
+    def available_cash(self, fallback):
+        return fallback
+
+    def buy(self, intent):
+        self.buys.append(intent)
+        return ExecutionResult(
+            fills=[Fill(intent.shares, intent.limit_price - 0.03, 0.0)],
+            status="filled",
+        )
+
+    def sell(self, intent):
+        self.sells.append(intent)
+        return ExecutionResult(status="no_fill", reason="no_liquidity")
+
+    def reconcile(self):
+        return None
+
+    def redeem(self, condition_id):
+        return False
+
+
 class EngineTest(unittest.TestCase):
-    def make_engine(self, rows, gamma=None):
+    def make_engine(self, rows, gamma=None, clob=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         db = os.path.join(tmp.name, "paper.db")
@@ -100,7 +146,8 @@ class EngineTest(unittest.TestCase):
         store = Store(db)
         self.addCleanup(store.close)
         store.ensure_account(1000.0)
-        engine = Engine(cfg, store, FakeData(rows), FakeClob(), gamma or FakeGamma())
+        engine = Engine(cfg, store, FakeData(rows), clob or FakeClob(),
+                        gamma or FakeGamma())
         return engine, store
 
     def test_copy_buy_and_proportional_sell(self):
@@ -153,6 +200,98 @@ class EngineTest(unittest.TestCase):
         engine.settle()
         self.assertEqual(store.count_open_positions(), 0)
         self.assertAlmostEqual(store.account()["cash"], 1000.0 - 2.01)
+
+    def test_strict_sell_fills_below_floor(self):
+        now = int(time.time())
+        engine, store = self.make_engine(
+            [trade_row("BUY", 100, 0.50, now - 5, tx="0x1")],
+            clob=FakeClob(bid=0.40, ask=0.50),
+        )
+        engine.cycle()
+        engine.data.rows = [trade_row("SELL", 40, 0.60, now - 4, tx="0x2")]
+        engine.cycle()
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertAlmostEqual(pos["shares"], 2.4)
+        sell = store.recent_fills(1)[0]
+        self.assertEqual(sell["side"], "SELL")
+        self.assertAlmostEqual(sell["price"], 0.40)
+        self.assertLess(sell["realized_pnl"], 0)
+
+    def test_pending_exit_is_retried(self):
+        now = int(time.time())
+        clob = MutableClob(bid=0.40, ask=0.50)
+        engine, store = self.make_engine(
+            [trade_row("BUY", 100, 0.50, now - 5, tx="0x1")], clob=clob,
+        )
+        engine.cycle()
+        engine.data.rows = [trade_row("SELL", 40, 0.60, now - 4, tx="0x2")]
+        clob.fail = True
+        engine.cycle()
+        pending = store.pending_exit("0xabc", "c1", "t1")
+        self.assertIsNotNone(pending)
+        self.assertAlmostEqual(pending["shares"], 1.6)
+        self.assertEqual(store.all_signals()[-1]["reason"], "exit_pending")
+
+        clob.fail = False
+        engine.maintenance()
+        self.assertIsNone(store.pending_exit("0xabc", "c1", "t1"))
+        self.assertAlmostEqual(
+            store.position("0xabc", "c1", "t1")["shares"], 2.4)
+        self.assertEqual(store.recent_fills(1)[0]["note"], "strict_exit")
+
+    def test_target_reconciliation_closes_orphan(self):
+        now = int(time.time())
+        engine, store = self.make_engine(
+            [trade_row("BUY", 100, 0.50, now - 5, tx="0x1")],
+        )
+        engine.cycle()
+        self.assertAlmostEqual(
+            store.position("0xabc", "c1", "t1")["shares"], 4.0)
+        self.assertAlmostEqual(store.target_shares("0xabc", "t1"), 100.0)
+
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [])
+        engine.reconcile_target_positions()
+        self.assertEqual(store.target_shares("0xabc", "t1"), 0.0)
+
+        engine.reconcile_orphan_positions()
+        pending = store.pending_exit("0xabc", "c1", "t1")
+        self.assertIsNotNone(pending)
+        self.assertAlmostEqual(pending["shares"], 4.0)
+
+        engine.retry_pending_exits()
+        self.assertEqual(
+            store.position("0xabc", "c1", "t1")["status"], "CLOSED")
+        self.assertIsNone(store.pending_exit("0xabc", "c1", "t1"))
+
+    def test_hot_reload_updates_paper_executor_config(self):
+        engine, store = self.make_engine([])
+        self.assertIsInstance(engine.executor, PaperExecutor)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "config.toml"
+        engine.cfg.path = path
+        config_io.save_config(engine.cfg, path)
+        engine._cfg_mtime = os.stat(path).st_mtime
+        updated = copy.deepcopy(engine.cfg)
+        updated.paper.min_fill_ratio = 0.75
+        config_io.save_config(updated, path)
+        stamp = os.stat(path).st_mtime + 2
+        os.utime(path, (stamp, stamp))
+        engine.maybe_reload_config()
+        self.assertAlmostEqual(engine.executor.cfg.min_fill_ratio, 0.75)
+
+    def test_injected_executor_is_used_for_buys(self):
+        now = int(time.time())
+        engine, store = self.make_engine(
+            [trade_row("BUY", 100, 0.50, now - 5)])
+        executor = FakeExecutor()
+        engine.executor = executor
+        engine.cycle()
+        self.assertEqual(len(executor.buys), 1)
+        self.assertEqual(executor.buys[0].side, "BUY")
+        self.assertAlmostEqual(
+            store.position("0xabc", "c1", "t1")["shares"], 4.0)
 
     def test_second_cycle_does_not_duplicate(self):
         now = int(time.time())

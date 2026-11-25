@@ -1,0 +1,74 @@
+{
+  "data_api": {
+    "path": "/root/polycopy/data/paper_f705.db",
+    "name": "data_api",
+    "signals": 1,
+    "copied": 0,
+    "latency_median": 6.818606853485107,
+    "latency_p90": 6.818606853485107,
+    "latency_max": 6.818606853485107,
+    "notional": 0,
+    "fees": 0,
+    "reasons": {
+      "target_no_position": 1
+    }
+  },
+  "onchain": {
+    "path": "data/paper_f705_onchain.db",
+    "name": "onchain",
+    "signals": 1,
+    "copied": 0,
+    "latency_median": 0.2948887348175049,
+    "latency_p90": 0.2948887348175049,
+    "latency_max": 0.2948887348175049,
+    "notional": 0,
+    "fees": 0,
+    "reasons": {
+      "target_no_position": 1
+    }
+  },
+  "since": 1795428709,
+  "excluded_data_api_before_start": 20,
+  "matched": 1,
+  "matched_latency": {
+    "data_api_median": 6.818606853485107,
+    "data_api_p90": 6.818606853485107,
+    "onchain_median": 0.2948887348175049,
+    "onchain_p90": 0.2948887348175049,
+    "lead_median": 6.5237181186676025,
+    "lead_p90": 6.5237181186676025,
+    "lead_max": 6.5237181186676025,
+    "created_lead_median": 6.0
+  },
+  "both_copied": 0,
+  "slippage": {
+    "data_api_median": null,
+    "onchain_median": null,
+    "data_api_mean": null,
+    "onchain_mean": null,
+    "improvement_median": null,
+    "improvement_mean": null
+  },
+  "only_data_api": 0,
+  "only_onchain": 0,
+  "pairs": [
+    {
+      "tx": "0xe7963fe4d1e04133ea16283d23100b2ccf6757e382bc8a9830e3d0105a8e9160",
+      "side": "SELL",
+      "size": 800.0,
+      "signal_price": 0.98301875,
+      "api_latency": 6.818606853485107,
+      "chain_latency": 0.2948887348175049,
+      "api_copied": false,
+      "chain_copied": false,
+      "api_reason": "target_no_position",
+      "chain_reason": "target_no_position",
+      "api_price": null,
+      "chain_price": null,
+      "api_slip": null,
+      "chain_slip": null
+    }
+  ],
+  "only_data_api_samples": [],
+  "only_onchain_samples": []
+}

@@ -17,15 +17,19 @@ class PaperConfig:
     poll_seconds: int = 5
     overlap_seconds: int = 900
     stale_signal_seconds: int = 300
-    fee_rate: float = 0.07          # Polymarket crypto taker fee: shares * p * (1-p) * 0.07
+    fee_rate: float = 0.01          # per-market: monthly/weekly crypto 0.01, BTC 5m/15m 0.05
     extra_slippage: float = 0.0     # added to buy VWAP / subtracted from sell VWAP
     min_fill_ratio: float = 0.5     # skip when the book can only fill less than this share
     max_buy_drift: float = 0.03     # max price above the target's fill we will pay
     max_sell_drift: float = 0.10    # max price below the target's fill we will accept
     max_buy_drift_pct: float = 0.10   # relative cap for cheap tokens
     max_sell_drift_pct: float = 0.15  # relative cap for cheap tokens
+    # Exits always follow the target: any bid is eligible, partial fills are
+    # retried.  Entries keep the buy drift caps above.
+    strict_exits: bool = True
     settle_every_seconds: int = 300
     mark_every_seconds: int = 300
+    target_reconcile_seconds: int = 60
     mark_limit: int = 100
     max_pages: int = 3
     page_limit: int = 500
@@ -60,10 +64,79 @@ class TargetConfig:
 
 
 @dataclass
+class RunConfig:
+    """Which execution path the bot uses.
+
+    Changing this value requires a bot restart; the engine refuses to hot-swap
+    an executor because paper and live books are different books.
+    """
+    mode: str = "paper"             # "paper" | "live"
+
+    def __post_init__(self) -> None:
+        self.mode = str(self.mode or "paper").lower()
+        if self.mode not in ("paper", "live"):
+            raise ValueError(f"run.mode must be 'paper' or 'live', got {self.mode!r}")
+
+
+@dataclass
+class LiveConfig:
+    """Live CLOB settings. Secrets are read from the environment, never TOML."""
+    dry_run: bool = True            # true = compute/record orders, submit nothing
+    private_key_env: str = "POLY_PRIVATE_KEY"
+    funder: str = ""                # proxy/funder wallet that holds USDC / positions
+    signature_type: int = 2         # 0 EOA, 1 email/Magic proxy, 2 browser/Safe proxy
+    host: str = "https://clob.polymarket.com"
+    chain_id: int = 137
+    max_order_usd: float = 500.0
+    max_total_exposure_usd: float = 5_000.0
+    max_daily_loss_usd: float = 500.0
+    min_order_shares: float = 5.0   # Polymarket CLOB minimum is commonly 5 shares
+    order_timeout_seconds: int = 30
+    kill_switch_path: str = "data/LIVE_HALT"
+    redeem: bool = True
+    max_book_depth_pct: float = 0.25  # max share of visible book depth per order
+    db_path: str = "data/live.db"     # never point this at the paper DB
+    log_path: str = "data/live.log"
+
+    def validate(self) -> None:
+        self.dry_run = bool(self.dry_run)
+        self.private_key_env = str(self.private_key_env or "").strip()
+        self.funder = str(self.funder or "").strip()
+        self.db_path = str(self.db_path or "").strip()
+        self.log_path = str(self.log_path or "").strip()
+        self.host = str(self.host or "").strip()
+        if not self.db_path:
+            raise ValueError("live.db_path must not be empty")
+        if not self.log_path:
+            raise ValueError("live.log_path must not be empty")
+        if not self.host:
+            raise ValueError("live.host must not be empty")
+        self.chain_id = int(self.chain_id)
+        if self.chain_id <= 0:
+            raise ValueError("live.chain_id must be positive")
+        if self.signature_type not in (0, 1, 2):
+            raise ValueError("live.signature_type must be 0, 1 or 2")
+        for name in ("max_order_usd", "max_total_exposure_usd",
+                     "max_daily_loss_usd", "min_order_shares"):
+            value = float(getattr(self, name))
+            if value < 0:
+                raise ValueError(f"live.{name} must be >= 0")
+            setattr(self, name, value)
+        if self.max_order_usd <= 0:
+            raise ValueError("live.max_order_usd must be > 0")
+        if self.order_timeout_seconds < 1:
+            raise ValueError("live.order_timeout_seconds must be >= 1")
+        if not (0.0 <= self.max_book_depth_pct <= 1.0):
+            raise ValueError("live.max_book_depth_pct must be between 0 and 1")
+
+
+@dataclass
 class AppConfig:
     account: AccountConfig
     paper: PaperConfig
     targets: dict[str, TargetConfig]
+    run: RunConfig = field(default_factory=RunConfig)
+    live: LiveConfig = field(default_factory=LiveConfig)
     path: Path | None = None
 
 
@@ -89,6 +162,9 @@ def load_config(path: str | Path) -> AppConfig:
 
     account = AccountConfig(**_filter_fields(AccountConfig, raw.get("account", {})))
     paper = PaperConfig(**_filter_fields(PaperConfig, raw.get("paper", {})))
+    run = RunConfig(**_filter_fields(RunConfig, raw.get("run", {})))
+    live = LiveConfig(**_filter_fields(LiveConfig, raw.get("live", {})))
+    live.validate()
 
     targets: dict[str, TargetConfig] = {}
     for name, tdata in (raw.get("targets") or {}).items():
@@ -98,4 +174,5 @@ def load_config(path: str | Path) -> AppConfig:
     if not targets:
         raise ValueError("config must define at least one [targets.<name>]")
 
-    return AppConfig(account=account, paper=paper, targets=targets, path=path)
+    return AppConfig(account=account, paper=paper, targets=targets,
+                     run=run, live=live, path=path)

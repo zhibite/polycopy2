@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS fills (
     ts INTEGER NOT NULL,
     target TEXT,
     signal_id INTEGER,
+    order_id INTEGER,
     condition_id TEXT NOT NULL,
     token_id TEXT NOT NULL,
     outcome TEXT,
@@ -108,6 +109,35 @@ CREATE TABLE IF NOT EXISTS fills (
     note TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_fills_ts ON fills(ts);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dedupe_key TEXT NOT NULL,
+    target TEXT NOT NULL,
+    mode TEXT NOT NULL DEFAULT 'live',
+    side TEXT NOT NULL,
+    condition_id TEXT NOT NULL DEFAULT '',
+    token_id TEXT NOT NULL,
+    outcome TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL DEFAULT '',
+    event_slug TEXT NOT NULL DEFAULT '',
+    limit_price REAL NOT NULL DEFAULT 0,
+    size REAL NOT NULL DEFAULT 0,
+    filled_size REAL NOT NULL DEFAULT 0,
+    avg_price REAL NOT NULL DEFAULT 0,
+    fee REAL NOT NULL DEFAULT 0,
+    fee_rate REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    reason TEXT,
+    client_order_id TEXT,
+    exchange_order_id TEXT,
+    raw TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(dedupe_key, side, mode)
+);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_token ON orders(token_id);
 
 CREATE TABLE IF NOT EXISTS settlements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,6 +157,21 @@ CREATE TABLE IF NOT EXISTS marks (
     ask REAL,
     mid REAL
 );
+
+CREATE TABLE IF NOT EXISTS pending_exits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target TEXT NOT NULL,
+    condition_id TEXT NOT NULL DEFAULT '',
+    token_id TEXT NOT NULL,
+    outcome TEXT NOT NULL DEFAULT '',
+    shares REAL NOT NULL,
+    reason TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(target, condition_id, token_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pending_exits_target ON pending_exits(target);
 
 CREATE TABLE IF NOT EXISTS kv (
     key TEXT PRIMARY KEY,
@@ -156,6 +201,23 @@ class Store:
             self.conn.execute(
                 "ALTER TABLE fills ADD COLUMN realized_pnl REAL NOT NULL DEFAULT 0"
             )
+        if "order_id" not in cols:
+            self.conn.execute("ALTER TABLE fills ADD COLUMN order_id INTEGER")
+        order_cols = {
+            row[1] for row in self.conn.execute("PRAGMA table_info(orders)")
+        }
+        if order_cols:
+            if "title" not in order_cols:
+                self.conn.execute(
+                    "ALTER TABLE orders ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+            if "event_slug" not in order_cols:
+                self.conn.execute(
+                    "ALTER TABLE orders ADD COLUMN event_slug TEXT NOT NULL"
+                    " DEFAULT ''")
+            if "fee_rate" not in order_cols:
+                self.conn.execute(
+                    "ALTER TABLE orders ADD COLUMN fee_rate REAL NOT NULL"
+                    " DEFAULT 0")
         signal_cols = {
             row[1] for row in self.conn.execute("PRAGMA table_info(signals)")
         }
@@ -263,12 +325,207 @@ class Store:
             (max(0.0, shares), int(time.time()), target, token_id),
         )
 
+    def replace_target_positions(
+            self, target: str, positions: list[tuple[str, str, float]],
+            ts: int) -> int:
+        """Replace the target ledger with the target's actual open positions.
+
+        ``positions`` is ``(condition_id, token_id, shares)``.  Called only
+        after a successful data-api /positions read, never on API failure.
+        """
+        self.conn.execute(
+            "DELETE FROM target_positions WHERE target = ?", (target,))
+        rows = [(target, cond, token, float(shares), ts)
+                for cond, token, shares in positions
+                if token and float(shares) > 1e-12]
+        if rows:
+            self.conn.executemany(
+                "INSERT INTO target_positions(target, condition_id, token_id,"
+                " shares, updated_at) VALUES (?,?,?,?,?)",
+                rows,
+            )
+        return len(rows)
+
     def target_tokens_for_condition(self, target: str, condition_id: str) -> list[str]:
         rows = self.conn.execute(
             "SELECT token_id FROM target_positions WHERE target = ? AND condition_id = ?",
             (target, condition_id),
         ).fetchall()
         return [r["token_id"] for r in rows]
+
+    # ------------------------------------------------------------ pending exits
+    def queue_pending_exit(self, *, target: str, condition_id: str, token_id: str,
+                           outcome: str, shares: float, reason: str,
+                           ts: int) -> None:
+        """Remember an unfilled target exit; retried by the engine.
+
+        Shares are capped at the current paper position, so a stale pending
+        amount can never sell more than we actually hold.
+        """
+        if shares <= 1e-12:
+            return
+        pos = self.position(target, condition_id, token_id)
+        held = float(pos["shares"]) if pos and pos.get("status") == "OPEN" else 0.0
+        if held <= 1e-12:
+            return
+        row = self.pending_exit(target, condition_id, token_id)
+        pending = float(row["shares"]) if row else 0.0
+        total = min(held, pending + float(shares))
+        if total <= 1e-12:
+            return
+        if row:
+            self.conn.execute(
+                "UPDATE pending_exits SET shares = ?, outcome = ?, reason = ?,"
+                " updated_at = ? WHERE id = ?",
+                (total, outcome, reason, ts, row["id"]),
+            )
+        else:
+            self.conn.execute(
+                "INSERT INTO pending_exits(target, condition_id, token_id, outcome,"
+                " shares, reason, attempts, created_at, updated_at)"
+                " VALUES (?,?,?,?,?,?,0,?,?)",
+                (target, condition_id, token_id, outcome, total, reason, ts, ts),
+            )
+
+    def pending_exit(self, target: str, condition_id: str,
+                     token_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM pending_exits WHERE target = ? AND condition_id = ?"
+            " AND token_id = ?",
+            (target, condition_id, token_id),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def pending_exits(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM pending_exits ORDER BY id"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_pending_exit(self, exit_id: int, *, shares: float,
+                            attempts: int, reason: str, ts: int) -> None:
+        if shares <= 1e-12:
+            self.delete_pending_exit(exit_id)
+            return
+        self.conn.execute(
+            "UPDATE pending_exits SET shares = ?, attempts = ?, reason = ?,"
+            " updated_at = ? WHERE id = ?",
+            (shares, attempts, reason, ts, exit_id),
+        )
+
+    def delete_pending_exit(self, exit_id: int) -> None:
+        self.conn.execute("DELETE FROM pending_exits WHERE id = ?", (exit_id,))
+
+    def clear_pending_exits(self, target: str, condition_id: str,
+                            token_id: str) -> None:
+        self.conn.execute(
+            "DELETE FROM pending_exits WHERE target = ? AND condition_id = ?"
+            " AND token_id = ?",
+            (target, condition_id, token_id),
+        )
+
+    # --------------------------------------------------------------- orders
+    def create_order(self, *, dedupe_key: str, target: str, mode: str,
+                     side: str, condition_id: str, token_id: str,
+                     outcome: str, limit_price: float, size: float,
+                     status: str = "INTENT", reason: str | None = None,
+                     fee_rate: float = 0.0, title: str = "",
+                     event_slug: str = "",
+                     client_order_id: str | None = None,
+                     ts: int | None = None) -> dict[str, Any]:
+        """Insert an order intent before any network call.
+
+        The UNIQUE key makes the intent idempotent: replaying the same target
+        fill cannot create a second live order.  Callers must commit before
+        submitting so a crash is recoverable.
+        """
+        now = int(ts or time.time())
+        self.conn.execute(
+            "INSERT OR IGNORE INTO orders(dedupe_key, target, mode, side,"
+            " condition_id, token_id, outcome, title, event_slug, limit_price,"
+            " size, filled_size, avg_price, fee, fee_rate, status, reason,"
+            " client_order_id, raw, created_at, updated_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,0,0,0,?,?,?,?,?,?,?)",
+            (dedupe_key, target, mode, side, condition_id, token_id, outcome,
+             title, event_slug, float(limit_price), float(size),
+             float(fee_rate), status, reason, client_order_id, "", now, now),
+        )
+        row = self.conn.execute(
+            "SELECT * FROM orders WHERE dedupe_key = ? AND side = ? AND mode = ?",
+            (dedupe_key, side, mode),
+        ).fetchone()
+        return dict(row) if row else {}
+
+    def order(self, order_id: int) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+        return dict(row) if row else None
+
+    def order_for(self, dedupe_key: str, side: str,
+                  mode: str = "live") -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM orders WHERE dedupe_key = ? AND side = ? AND mode = ?",
+            (dedupe_key, side, mode),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def orders(self, *, mode: str = "live",
+               statuses: tuple[str, ...] | None = None) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM orders WHERE mode = ?"
+        params: list[Any] = [mode]
+        if statuses:
+            sql += " AND status IN (" + ",".join("?" for _ in statuses) + ")"
+            params.extend(statuses)
+        sql += " ORDER BY id"
+        rows = self.conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_order(self, order_id: int, *, status: str | None = None,
+                     filled_size: float | None = None,
+                     avg_price: float | None = None,
+                     fee: float | None = None,
+                     reason: str | None = None,
+                     client_order_id: str | None = None,
+                     exchange_order_id: str | None = None,
+                     raw: str | None = None,
+                     ts: int | None = None) -> None:
+        updates: list[str] = ["updated_at = ?"]
+        params: list[Any] = [int(ts or time.time())]
+        mapping = {
+            "status": status, "filled_size": filled_size, "avg_price": avg_price,
+            "fee": fee, "reason": reason, "client_order_id": client_order_id,
+            "exchange_order_id": exchange_order_id, "raw": raw,
+        }
+        for column, value in mapping.items():
+            if value is not None:
+                updates.append(f"{column} = ?")
+                params.append(value)
+        params.append(int(order_id))
+        self.conn.execute(
+            "UPDATE orders SET " + ", ".join(updates) + " WHERE id = ?", params)
+
+    def fill_count_for_order(self, order_id: int) -> int:
+        row = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM fills WHERE order_id = ?",
+            (int(order_id),),
+        ).fetchone()
+        return int(row["c"]) if row else 0
+
+    # ------------------------------------------------------------ risk views
+    def realized_pnl_since(self, start_ts: int) -> float:
+        row = self.conn.execute(
+            "SELECT COALESCE(SUM(realized_pnl), 0) AS v FROM ("
+            " SELECT realized_pnl FROM fills WHERE ts >= ?"
+            " UNION ALL SELECT realized_pnl FROM settlements WHERE ts >= ?"
+            ")", (int(start_ts), int(start_ts)),
+        ).fetchone()
+        return float(row["v"]) if row else 0.0
+
+    def total_open_cost(self) -> float:
+        row = self.conn.execute(
+            "SELECT COALESCE(SUM(shares * avg_cost), 0) AS v FROM positions"
+            " WHERE status = 'OPEN'").fetchone()
+        return float(row["v"]) if row else 0.0
 
     # -------------------------------------------------------------- signals
     def record_signal(self, *, target: str, dedupe_key: str, ts: int,
@@ -351,7 +608,7 @@ class Store:
     def apply_buy(self, *, ts: int, target: str, signal_id: int | None,
                   condition_id: str, token_id: str, outcome: str, title: str,
                   event_slug: str, shares: float, price: float,
-                  fee: float) -> None:
+                  fee: float, order_id: int | None = None) -> None:
         if shares <= 0:
             return
         notional = shares * price
@@ -391,16 +648,18 @@ class Store:
                  shares, total_cost / shares, ts, ts),
             )
         self.conn.execute(
-            "INSERT INTO fills(ts, target, signal_id, condition_id, token_id,"
-            " outcome, side, shares, price, notional, fee, kind)"
-            " VALUES (?,?,?,?,?,?,'BUY',?,?,?,?,'COPY')",
-            (ts, target, signal_id, condition_id, token_id, outcome, shares,
-             price, notional, fee),
+            "INSERT INTO fills(ts, target, signal_id, order_id, condition_id,"
+            " token_id, outcome, side, shares, price, notional, fee, kind)"
+            " VALUES (?,?,?,?,?,?,?,'BUY',?,?,?,?,'COPY')",
+            (ts, target, signal_id, order_id, condition_id, token_id, outcome,
+             shares, price, notional, fee),
         )
 
     def apply_sell(self, *, ts: int, target: str, signal_id: int | None,
                    condition_id: str, token_id: str, outcome: str,
-                   shares: float, price: float, fee: float) -> dict[str, float] | None:
+                   shares: float, price: float, fee: float,
+                   note: str | None = None,
+                   order_id: int | None = None) -> dict[str, float] | None:
         row = self.conn.execute(
             "SELECT * FROM positions WHERE target = ? AND condition_id = ?"
             " AND token_id = ? AND status = 'OPEN'",
@@ -430,12 +689,15 @@ class Store:
             (proceeds, realized, fee),
         )
         self.conn.execute(
-            "INSERT INTO fills(ts, target, signal_id, condition_id, token_id,"
-            " outcome, side, shares, price, notional, fee, realized_pnl, kind)"
-            " VALUES (?,?,?,?,?,?,'SELL',?,?,?,?,?,'COPY')",
-            (ts, target, signal_id, condition_id, token_id, outcome, sell_shares,
-             price, notional, fee, realized),
+            "INSERT INTO fills(ts, target, signal_id, order_id, condition_id,"
+            " token_id, outcome, side, shares, price, notional, fee,"
+            " realized_pnl, kind, note)"
+            " VALUES (?,?,?,?,?,?,?,'SELL',?,?,?,?,?,'COPY',?)",
+            (ts, target, signal_id, order_id, condition_id, token_id, outcome,
+             sell_shares, price, notional, fee, realized, note),
         )
+        if status == "CLOSED":
+            self.clear_pending_exits(target, condition_id, token_id)
         return {"shares": sell_shares, "price": price, "notional": notional,
                 "fee": fee, "realized": realized}
 
@@ -463,6 +725,8 @@ class Store:
             (ts, pos["condition_id"], pos["token_id"], pos.get("outcome"),
              shares, payout, realized),
         )
+        self.clear_pending_exits(pos["target"], pos["condition_id"],
+                                 pos["token_id"])
         return realized
 
     # ------------------------------------------------------------------ marks

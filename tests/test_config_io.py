@@ -2,7 +2,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from polycopy.config import AccountConfig, AppConfig, PaperConfig, TargetConfig, load_config
+from polycopy.config import (
+    AccountConfig, AppConfig, LiveConfig, PaperConfig, RunConfig, TargetConfig,
+    load_config,
+)
 from polycopy.web import config_io
 
 
@@ -63,6 +66,45 @@ class ConfigIOTest(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("fee_rate = None", text)
             self.assertIsNone(load_config(path).targets["t"].fee_rate)
+
+    def test_run_and_live_roundtrip(self):
+        cfg = AppConfig(
+            account=AccountConfig(),
+            paper=PaperConfig(),
+            run=RunConfig(mode="live"),
+            live=LiveConfig(
+                dry_run=False,
+                funder="0xfunder",
+                private_key_env="TEST_POLY_KEY",
+                signature_type=2,
+                max_order_usd=25.0,
+                max_daily_loss_usd=10.0,
+                kill_switch_path="data/TEST_HALT",
+            ),
+            targets={"t": TargetConfig(address="0xabc")},
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.toml"
+            config_io.save_config(cfg, path)
+            loaded = load_config(path)
+            self.assertEqual(loaded.run.mode, "live")
+            self.assertFalse(loaded.live.dry_run)
+            self.assertEqual(loaded.live.funder, "0xfunder")
+            self.assertEqual(loaded.live.private_key_env, "TEST_POLY_KEY")
+            self.assertEqual(loaded.live.max_order_usd, 25.0)
+            self.assertEqual(loaded.live.kill_switch_path, "data/TEST_HALT")
+
+    def test_missing_run_section_defaults_to_paper(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.toml"
+            path.write_text(
+                "[account]\nstarting_cash = 1000.0\n\n"
+                "[targets.t]\naddress = \"0xabc\"\n",
+                encoding="utf-8",
+            )
+            cfg = load_config(path)
+            self.assertEqual(cfg.run.mode, "paper")
+            self.assertTrue(cfg.live.dry_run)
 
 
 if __name__ == "__main__":

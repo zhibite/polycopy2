@@ -9,7 +9,8 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
-from ..config import AppConfig, PaperConfig, TargetConfig
+from ..config import (AppConfig, LiveConfig, PaperConfig, RunConfig,
+                      TargetConfig)
 
 
 def _toml_value(value: Any) -> str:
@@ -26,8 +27,9 @@ def _toml_value(value: Any) -> str:
 
 def dumps_config(cfg: AppConfig) -> str:
     lines: list[str] = [
-        "# polycopy paper-trading configuration",
-        "# Edited via the dashboard; the engine hot-reloads this file.",
+        "# polycopy copy-trading configuration",
+        "# Edited via the dashboard; the engine hot-reloads strategy fields.",
+        "# run.mode / live.* changes require a bot restart.",
         "",
         "[account]",
         f"starting_cash = {_toml_value(cfg.account.starting_cash)}",
@@ -36,6 +38,15 @@ def dumps_config(cfg: AppConfig) -> str:
     ]
     for field in fields(PaperConfig):
         value = getattr(cfg.paper, field.name)
+        if value is not None:
+            lines.append(f"{field.name} = {_toml_value(value)}")
+    lines.extend(["", "[run]"])
+    for field in fields(RunConfig):
+        lines.append(
+            f"{field.name} = {_toml_value(getattr(cfg.run, field.name))}")
+    lines.extend(["", "[live]"])
+    for field in fields(LiveConfig):
+        value = getattr(cfg.live, field.name)
         if value is not None:
             lines.append(f"{field.name} = {_toml_value(value)}")
     for name, target in cfg.targets.items():

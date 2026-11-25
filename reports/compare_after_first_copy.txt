@@ -1,0 +1,64 @@
+==============================================================================
+SIGNAL SOURCE COMPARISON
+==============================================================================
+data-api : /root/polycopy/data/paper_f705.db
+           signals=35 copied=1 notional=$10.09 fees=$0.45
+on-chain : data/paper_f705_onchain.db
+           signals=35 copied=1 notional=$9.89 fees=$0.45
+data-api signals before on-chain start excluded: 20
+
+matched by (tx, side, token): 35
+lead of on-chain over data-api (s): median 9.421  p90 19.074  max 24.299
+copy latency (s)  data-api: median 9.421  p90 19.074
+                  on-chain: median 0.044  p90 0.964
+both copied: 1
+adverse slippage vs target fill (c/share):
+  data-api median 2.25  mean 2.25
+  on-chain median 1.54  mean 1.54
+  improvement median 0.71  mean 0.71  (positive = on-chain better)
+
+signals only in data-api: 0
+signals only in on-chain: 0
+data-api skip reasons: {'price_out_of_range': 28, 'target_no_position': 5, 'drift': 1}
+on-chain skip reasons: {'price_out_of_range': 28, 'target_no_position': 5, 'drift': 1}
+
+PAIRS
+------------------------------------------------------------------------------
+tx             side        size  api_lat chain_lat   api_px chain_px  api_slip chain_slip  reasons
+0xe7963fe4d1   SELL    800.0000     6.82      0.29        -        -         -          -  target_no_position/target_no_position
+0xd36198020e   SELL    334.0000     9.42      0.00        -        -         -          -  target_no_position/target_no_position
+0x2f329ec649   SELL    672.0100    12.57      0.00        -        -         -          -  target_no_position/target_no_position
+0x1196953eb1   SELL    670.0000     6.44      0.00        -        -         -          -  target_no_position/target_no_position
+0x28d9d1ea78   SELL    270.0000     8.00      0.00        -        -         -          -  target_no_position/target_no_position
+0xd39b33714d   BUY     670.0000    21.29      0.96        -        -         -          -  price_out_of_range/price_out_of_range
+0x365d5064af   BUY     267.7500    13.29      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0xea6eff159b   BUY     267.5500    12.29      0.93        -        -         -          -  price_out_of_range/price_out_of_range
+0x211aa8c668   BUY     668.2000    12.29      0.45        -        -         -          -  price_out_of_range/price_out_of_range
+0x73a8bbf2a6   BUY     670.0000     9.29      0.26        -        -         -          -  price_out_of_range/price_out_of_range
+0x47ab9b2e1c   BUY     650.0000    22.18      0.02        -        -         -          -  price_out_of_range/price_out_of_range
+0xda0cdcaf88   BUY     670.0000    13.18      0.31        -        -         -          -  price_out_of_range/price_out_of_range
+0xeac98d0a8c   BUY     155.0000    11.18      0.51        -        -         -          -  price_out_of_range/price_out_of_range
+0x07ced56757   BUY    7179.3500    11.18      0.14        -        -         -          -  price_out_of_range/price_out_of_range
+0xb3477c279c   BUY     483.3300     8.18      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0xb24e95a066   BUY    3018.3300     4.20      0.80        -        -         -          -  price_out_of_range/price_out_of_range
+0x9255a96e6b   BUY     650.0000     4.14      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0x74148ff8f4   BUY    1515.4000    25.34      1.04        -        -         -          -  drift/drift
+0xfcfdf2ae68   BUY   10000.0000     5.34      1.21        -        -         -          -  price_out_of_range/price_out_of_range
+0x45fce97700   BUY    4000.0000     4.35      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0x97b29aee9d   BUY     697.9800     8.75      0.22        -        -         -          -  price_out_of_range/price_out_of_range
+0xa71d894dd3   BUY     200.0000    15.03      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0xd49222430f   BUY    1686.4636     6.02      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0x55236d56a4   BUY    6145.2200    12.25      0.33        -        -         -          -  price_out_of_range/price_out_of_range
+0x95d4c5d132   BUY    1745.0811    10.25      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0xb8060c4a8a   BUY     552.3429     2.09      0.04   0.3628   0.3557    0.0225     0.0154  copied/copied
+0xfd4e6e9e93   BUY    2001.0000    11.85      0.55        -        -         -          -  price_out_of_range/price_out_of_range
+0xceb4703db4   BUY    7020.0000    19.07      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0xd2dba4221e   BUY    7242.0000     8.51      0.12        -        -         -          -  price_out_of_range/price_out_of_range
+0x7dc5304161   BUY     650.0000     5.51      1.32        -        -         -          -  price_out_of_range/price_out_of_range
+0xf74ac04faf   BUY     650.0000     3.51      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0xc879863756   BUY    1853.9600    11.35      0.17        -        -         -          -  price_out_of_range/price_out_of_range
+0xf3624d3c17   BUY     288.1221    11.35      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0x99ef14c15e   BUY     124.4200     8.35      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+0x401dce2da4   BUY   10000.0000     3.70      0.00        -        -         -          -  price_out_of_range/price_out_of_range
+
+wrote data/compare_after_first_copy.json

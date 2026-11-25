@@ -89,6 +89,11 @@ def kv_int(conn: sqlite3.Connection | None, key: str) -> int | None:
         return None
 
 
+def kv_str(conn: sqlite3.Connection | None, key: str) -> str | None:
+    row = _one(conn, "SELECT value FROM kv WHERE key = ?", (key,))
+    return str(row["value"]) if row else None
+
+
 def open_positions(conn: sqlite3.Connection | None,
                    limit: int = 500) -> list[dict[str, Any]]:
     return _all(

@@ -9,21 +9,26 @@ from typing import Any
 from . import broker, rules
 from .api import ClobApi, DataApi, GammaApi
 from .config import AppConfig, TargetConfig, load_config
+from .execution import Executor, PaperExecutor, TradeIntent
 from .store import Store
 
 
 class Engine:
     def __init__(self, cfg: AppConfig, store: Store, data_api: DataApi,
                  clob_api: ClobApi, gamma_api: GammaApi,
-                 logger: logging.Logger | None = None):
+                 logger: logging.Logger | None = None,
+                 executor: Executor | None = None):
         self.cfg = cfg
         self.store = store
         self.data = data_api
         self.clob = clob_api
         self.gamma = gamma_api
         self.log = logger or logging.getLogger("polycopy.engine")
+        self.executor = executor or PaperExecutor(clob_api, cfg.paper,
+                                                  logger=self.log)
         self._last_settle = 0
         self._last_mark = 0
+        self._last_target_reconcile = 0
         self._market_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._token_cache: dict[str, tuple[float, list[str]]] = {}
         self._cycles = 0
@@ -49,7 +54,19 @@ class Engine:
             self.log.exception("config reload failed, keeping current config")
             self._cfg_mtime = mtime
             return
+        if (new_cfg.run != self.cfg.run or new_cfg.live != self.cfg.live):
+            self.log.warning(
+                "run/live settings changed (%s/%s -> %s/%s); restart required,"
+                " keeping the current config",
+                self.cfg.run.mode, self.cfg.live.dry_run,
+                new_cfg.run.mode, new_cfg.live.dry_run,
+            )
+            self._cfg_mtime = mtime
+            return
         self.cfg = new_cfg
+        if isinstance(self.executor, PaperExecutor):
+            self.executor.cfg = new_cfg.paper
+            self.executor.min_shares = float(new_cfg.paper.min_shares)
         self._cfg_mtime = mtime
         self.log.info("config reloaded from %s", path)
 
@@ -68,6 +85,21 @@ class Engine:
     def maintenance(self) -> None:
         """Settlement, marks and heartbeat; safe to call from any source loop."""
         now = int(time.time())
+        if now - self._last_target_reconcile >= self.cfg.paper.target_reconcile_seconds:
+            try:
+                self.reconcile_target_positions()
+                self._last_target_reconcile = now
+            except Exception:
+                self.log.exception("target position reconciliation failed")
+        try:
+            self.reconcile_orphan_positions()
+        except Exception:
+            self.log.exception("orphan reconciliation failed")
+        try:
+            self.retry_pending_exits()
+        except Exception:
+            self.log.exception("pending exit retry failed")
+
         if now - self._last_settle >= self.cfg.paper.settle_every_seconds:
             try:
                 self.settle()
@@ -82,6 +114,11 @@ class Engine:
             except Exception:
                 self.log.exception("marking failed")
 
+        self.store.set_kv("execution_mode",
+                          "live" if self.executor.is_live else "paper")
+        self.store.set_kv(
+            "execution_dry_run",
+            "1" if self.executor.is_live and self.cfg.live.dry_run else "0")
         self.store.set_kv("bot_heartbeat", str(int(time.time())))
         self.store.commit()
         self._cycles += 1
@@ -209,7 +246,8 @@ class Engine:
             return
 
         account = self.store.account()
-        cash = float(account["cash"])
+        ledger_cash = float(account["cash"])
+        cash = float(self.executor.available_cash(ledger_cash))
         available = max(0.0, cash * (1.0 - self.cfg.paper.cash_reserve_pct))
         remaining_market = max(0.0, target.max_market_usd - market_usd)
         budget = min(rules.desired_notional(target, usd), remaining_market, available)
@@ -226,74 +264,75 @@ class Engine:
 
         price_ref = max(signal_price, 1e-6)
         shares = budget / price_ref
-        if shares < self.cfg.paper.min_shares:
-            need = self.cfg.paper.min_shares * price_ref
+        min_shares = float(self.executor.min_shares)
+        if shares < min_shares:
+            need = min_shares * price_ref
             if (need > target.max_notional_usd or need > remaining_market
                     or need > available):
                 self._skip(target, row, "below_min_size", source=source)
                 return
-            shares = self.cfg.paper.min_shares
+            shares = min_shares
             budget = need
 
-        payload = self.clob.book(token)
-        if not payload:
-            self._skip(target, row, "book_unavailable", source=source)
-            return
-        book = broker.parse_book(payload)
-        ex, reason = broker.simulate_buy(book, shares, signal_price, self.cfg.paper)
-        if ex is None:
-            self._skip(target, row, reason or "no_fill", source=source)
-            return
-
         fee_rate = self._fee_rate(target)
-        notional = ex.shares * ex.price
-        fee = broker.taker_fee(ex.shares, ex.price, fee_rate)
-        if (notional > remaining_market + 1e-9
-                or notional + fee > available + 1e-9):
-            scale = 1.0
-            if notional > 0:
-                scale = min(scale, remaining_market / notional)
-            if notional + fee > 0:
-                scale = min(scale, available / (notional + fee))
-            scaled = ex.shares * max(0.0, scale)
-            if scaled * ex.price < target.min_notional_usd:
-                reason = ("insufficient_cash" if available < remaining_market
-                          else "max_market_exposure")
-                self._skip(target, row, reason, source=source)
-                return
-            ex2, reason = broker.simulate_buy(book, scaled, signal_price, self.cfg.paper)
-            if ex2 is None:
-                self._skip(target, row, reason or "no_fill", source=source)
-                return
-            ex = ex2
-            notional = ex.shares * ex.price
-            fee = broker.taker_fee(ex.shares, ex.price, fee_rate)
-
-        self.store.apply_buy(
-            ts=now, target=target.address, signal_id=None, condition_id=cond,
-            token_id=token, outcome=str(row.get("outcome") or ""),
+        limit_price = broker.buy_cap(signal_price, self.cfg.paper, 0.001)
+        intent = TradeIntent(
+            dedupe_key=rules.dedupe_key(row), target=target.address,
+            condition_id=cond, token_id=token,
+            outcome=str(row.get("outcome") or ""),
             title=str(row.get("title") or ""),
             event_slug=str(row.get("event_slug") or ""),
-            shares=ex.shares, price=ex.price, fee=fee,
+            side="BUY", shares=shares, limit_price=limit_price,
+            signal_price=signal_price, fee_rate=fee_rate,
+            max_spend=available, max_market=remaining_market,
+            min_notional=target.min_notional_usd, source=source,
         )
+        result = self.executor.buy(intent)
+        if not result.fills:
+            reason = result.reason or "no_fill"
+            if result.status == "dry_run":
+                reason = "dry_run"
+            elif result.status == "submitted":
+                reason = "order_pending"
+            self._skip(target, row, reason, source=source)
+            return
+
+        total_shares = result.filled_shares
+        total_notional = result.notional
+        total_fee = result.fee
+        order_id = next((f.order_id for f in result.fills if f.order_id), None)
+        for fill in result.fills:
+            self.store.apply_buy(
+                ts=now, target=target.address, signal_id=None,
+                condition_id=cond, token_id=token,
+                outcome=str(row.get("outcome") or ""),
+                title=str(row.get("title") or ""),
+                event_slug=str(row.get("event_slug") or ""),
+                shares=fill.shares, price=fill.price, fee=fill.fee,
+                order_id=fill.order_id,
+            )
+        avg_price = total_notional / total_shares if total_shares else 0.0
         self._record_signal(
-            target, row, copied=True, reason=None, our_shares=ex.shares,
-            our_price=ex.price, our_notional=notional, our_fee=fee,
-            source=source,
+            target, row, copied=True, reason=None, our_shares=total_shares,
+            our_price=avg_price, our_notional=total_notional,
+            our_fee=total_fee, source=source,
         )
         title = str(row.get("title") or "")[:60]
         self.log.info(
             "COPY BUY %-8s px=%.3f sh=%.2f $=%.2f fee=%.4f open=%d "
-            "mkt=$%.2f cash=$%.2f latency=%.1fs %s",
-            name, ex.price, ex.shares, notional, fee, open_positions,
-            market_usd, cash, time.time() - int(row.get("timestamp") or 0),
-            title,
+            "mkt=$%.2f cash=$%.2f latency=%.1fs mode=%s%s %s",
+            name, avg_price, total_shares, total_notional, total_fee,
+            open_positions, market_usd, cash,
+            time.time() - int(row.get("timestamp") or 0),
+            "live" if self.executor.is_live else "paper",
+            "" if order_id is None else f" order={order_id}", title,
         )
         if 0.60 <= signal_price <= 0.70:
             self.log.info(
                 "THIN-EDGE 60-70c buy target=%.4f our=%.4f slip=%+.2fc "
                 "open=%d mkt=$%.2f cash=$%.2f %s",
-                signal_price, ex.price, (ex.price - signal_price) * 100.0,
+                signal_price, avg_price,
+                (avg_price - signal_price) * 100.0,
                 open_positions, market_usd, cash, title,
             )
 
@@ -304,51 +343,276 @@ class Engine:
         cond = str(row.get("condition_id") or "")
         token = str(row.get("token_id") or "")
         signal_price = rules.to_float(row.get("price"))
+        strict = self.cfg.paper.strict_exits
         pos = self.store.position(target.address, cond, token)
         if not pos or pos.get("status") != "OPEN" or float(pos["shares"]) <= 0:
             self._skip(target, row, "no_position", source=source)
             return
 
         our_shares = float(pos["shares"]) * frac
-        if our_shares < self.cfg.paper.min_shares:
+        if our_shares <= 1e-12:
             self._skip(target, row, "dust", source=source)
             return
+        if our_shares < float(self.executor.min_shares):
+            if self.executor.is_live or not strict:
+                # A live FAK order below the venue minimum would be rejected;
+                # strict exits cannot force it, so hold to settlement.
+                if strict:
+                    self.log.warning(
+                        "DUST EXIT %-8s sh=%.4f below min=%.2f;"
+                        " holding to settle", name, our_shares,
+                        self.executor.min_shares)
+                self._skip(target, row, "dust", source=source)
+                return
 
-        payload = self.clob.book(token)
-        if not payload:
-            self._skip(target, row, "book_unavailable", source=source)
-            return
-        book = broker.parse_book(payload)
-        ex, reason = broker.simulate_sell(book, our_shares, signal_price, self.cfg.paper)
-        if ex is None:
-            self._skip(target, row, reason or "no_fill", source=source)
+        fee_rate = self._fee_rate(target)
+        limit_price = (0.001 if strict
+                       else broker.sell_floor(signal_price, self.cfg.paper,
+                                              0.001))
+        intent = TradeIntent(
+            dedupe_key=rules.dedupe_key(row), target=target.address,
+            condition_id=cond, token_id=token,
+            outcome=str(row.get("outcome") or ""),
+            title=str(row.get("title") or ""),
+            event_slug=str(row.get("event_slug") or ""),
+            side="SELL", shares=our_shares, limit_price=limit_price,
+            signal_price=signal_price, fee_rate=fee_rate,
+            strict=strict, source=source,
+        )
+        result = self.executor.sell(intent)
+        if not result.fills:
+            if result.status == "dry_run":
+                self._skip(target, row, "dry_run", source=source)
+                return
+            if result.status == "submitted":
+                self._skip(target, row, "order_pending", source=source)
+                return
+            reason = result.reason or "no_fill"
+            if strict:
+                self._queue_exit(target, row, our_shares, reason)
+                self._skip(target, row, "exit_pending", source=source)
+            else:
+                self._skip(target, row, reason, source=source)
             return
 
-        fee = broker.taker_fee(ex.shares, ex.price, self._fee_rate(target))
+        total_shares = result.filled_shares
+        total_notional = result.notional
+        total_fee = result.fee
         open_positions = self.store.count_open_positions()
         market_usd = self.store.market_exposure(cond)
         cash = float(self.store.account()["cash"])
-        result = self.store.apply_sell(
-            ts=int(time.time()), target=target.address, signal_id=None,
-            condition_id=cond, token_id=token,
-            outcome=str(row.get("outcome") or ""), shares=ex.shares,
-            price=ex.price, fee=fee,
-        )
-        if result is None:
+        applied = None
+        for fill in result.fills:
+            sell_result = self.store.apply_sell(
+                ts=int(time.time()), target=target.address, signal_id=None,
+                condition_id=cond, token_id=token,
+                outcome=str(row.get("outcome") or ""), shares=fill.shares,
+                price=fill.price, fee=fill.fee,
+                note="strict_exit" if strict else None,
+                order_id=fill.order_id,
+            )
+            if sell_result is not None:
+                applied = sell_result
+        if applied is None:
             self._skip(target, row, "no_position", source=source)
             return
+        avg_price = total_notional / total_shares if total_shares else 0.0
+        if strict and total_shares < our_shares - 1e-9:
+            remaining = our_shares - total_shares
+            self._queue_exit(target, row, remaining, "partial_exit")
+            self.log.warning(
+                "STRICT EXIT partial %-8s filled=%.4f left=%.4f px=%.4f %s",
+                name, total_shares, remaining, avg_price,
+                str(row.get("title") or "")[:50],
+            )
         self._record_signal(
-            target, row, copied=True, reason=None, our_shares=ex.shares,
-            our_price=ex.price, our_notional=result["notional"], our_fee=fee,
-            source=source,
+            target, row, copied=True, reason=None, our_shares=total_shares,
+            our_price=avg_price, our_notional=total_notional,
+            our_fee=total_fee, source=source,
         )
         self.log.info(
             "COPY SELL %-8s px=%.3f sh=%.2f $=%.2f fee=%.4f frac=%.2f "
-            "open=%d mkt=$%.2f cash=$%.2f %s",
-            name, ex.price, ex.shares, result["notional"], fee, frac,
+            "open=%d mkt=$%.2f cash=$%.2f mode=%s %s",
+            name, avg_price, total_shares, total_notional, total_fee, frac,
             open_positions, market_usd, cash,
+            "live" if self.executor.is_live else "paper",
             str(row.get("title") or "")[:60],
         )
+
+    def _queue_exit(self, target: TargetConfig, row: dict[str, Any],
+                    shares: float, reason: str) -> None:
+        self.store.queue_pending_exit(
+            target=target.address,
+            condition_id=str(row.get("condition_id") or ""),
+            token_id=str(row.get("token_id") or ""),
+            outcome=str(row.get("outcome") or ""),
+            shares=shares, reason=reason, ts=int(time.time()),
+        )
+        self.store.commit()
+
+    # ------------------------------------------------------------ strict exits
+    def retry_pending_exits(self) -> int:
+        """Strictly sell any queued exit remainder at the best available bid."""
+        now = int(time.time())
+        filled = 0
+        targets = {t.address.lower(): t for t in self.cfg.targets.values()}
+        cooldown = 30 if self.executor.is_live else 0
+        for pending in self.store.pending_exits():
+            if (cooldown
+                    and now - int(pending.get("updated_at") or 0) < cooldown):
+                continue
+            target = targets.get(str(pending["target"]).lower())
+            if target is None:
+                self.store.delete_pending_exit(pending["id"])
+                continue
+            cond = str(pending["condition_id"])
+            token = str(pending["token_id"])
+            pos = self.store.position(target.address, cond, token)
+            if not pos or pos.get("status") != "OPEN" or float(pos["shares"]) <= 0:
+                self.store.delete_pending_exit(pending["id"])
+                continue
+            market = self._market(cond)
+            if market and market.get("closed"):
+                # Settlement closes it; keep the pending row until then.
+                continue
+            shares = min(float(pending["shares"]), float(pos["shares"]))
+            if (self.executor.is_live
+                    and shares < float(self.executor.min_shares)):
+                self.log.warning(
+                    "DUST EXIT drop pending id=%s sh=%.4f below min=%.2f",
+                    pending["id"], shares, self.executor.min_shares)
+                self.store.delete_pending_exit(pending["id"])
+                continue
+            attempts = int(pending["attempts"]) + 1
+            intent = TradeIntent(
+                dedupe_key=f"pending:{pending['id']}:{attempts}",
+                target=target.address, condition_id=cond, token_id=token,
+                outcome=str(pending.get("outcome") or ""),
+                title=str(pos.get("title") or ""),
+                event_slug=str(pos.get("event_slug") or ""),
+                side="SELL", shares=shares, limit_price=0.001,
+                signal_price=0.0, fee_rate=self._fee_rate(target),
+                strict=True, source="strict_exit",
+            )
+            result = self.executor.sell(intent)
+            if not result.fills:
+                if result.status == "dry_run":
+                    continue
+                self.store.update_pending_exit(
+                    pending["id"], shares=shares, attempts=attempts,
+                    reason=result.reason or "no_fill", ts=now,
+                )
+                continue
+            applied = None
+            for fill in result.fills:
+                applied = self.store.apply_sell(
+                    ts=now, target=target.address, signal_id=None,
+                    condition_id=cond, token_id=token,
+                    outcome=str(pending.get("outcome") or ""),
+                    shares=fill.shares, price=fill.price, fee=fill.fee,
+                    note="strict_exit", order_id=fill.order_id,
+                ) or applied
+            if applied is None:
+                self.store.delete_pending_exit(pending["id"])
+                continue
+            remaining = shares - result.filled_shares
+            if remaining > 1e-9:
+                self.store.update_pending_exit(
+                    pending["id"], shares=remaining,
+                    attempts=attempts, reason="partial", ts=now,
+                )
+            else:
+                self.store.delete_pending_exit(pending["id"])
+            filled += 1
+            avg = (result.notional / result.filled_shares
+                   if result.filled_shares else 0.0)
+            self.log.info(
+                "STRICT EXIT %-8s px=%.4f sh=%.3f $=%.2f fee=%.4f "
+                "remaining=%.4f mode=%s %s",
+                target.address[:10], avg, result.filled_shares,
+                result.notional, result.fee, max(0.0, remaining),
+                "live" if self.executor.is_live else "paper",
+                str(pending.get("reason") or ""),
+            )
+        self.store.commit()
+        return filled
+
+    def reconcile_target_positions(self) -> int:
+        """Replace target_positions with the target's actual open positions.
+
+        Uses data-api /positions ``current_size`` only as a ledger source; the
+        copy signals still come exclusively from the on-chain feed.  This is
+        what keeps sell fractions correct after MERGE/REDEEM/SPLIT events and
+        after positions opened before the current process started.
+        """
+        now = int(time.time())
+        total = 0
+        for name, target in self.cfg.targets.items():
+            if not target.enabled:
+                continue
+            rows = self.data.open_positions(
+                target.address, limit=500, max_pages=10,
+            )
+            if rows is None:
+                self.log.warning(
+                    "target ledger reconciliation failed target=%s", name)
+                continue
+            positions: dict[str, tuple[str, float]] = {}
+            for row in rows:
+                token = str(row.get("token_id") or "")
+                if not token:
+                    continue
+                size = rules.to_float(row.get("current_size"))
+                if size <= 1e-12:
+                    size = rules.to_float(row.get("size"))
+                if size <= 1e-12:
+                    continue
+                positions[token] = (
+                    str(row.get("condition_id") or ""), size,
+                )
+            self.store.replace_target_positions(
+                target.address,
+                [(cond, token, size)
+                 for token, (cond, size) in positions.items()],
+                now,
+            )
+            total += len(positions)
+            self.log.info(
+                "TARGET LEDGER %-8s positions=%d", name, len(positions))
+        self.store.commit()
+        return total
+
+    def reconcile_orphan_positions(self) -> int:
+        """Queue a full strict exit when the target is flat but we still hold."""
+        now = int(time.time())
+        queued = 0
+        for pos in self.store.open_positions(limit=10_000):
+            target_addr = str(pos.get("target") or "")
+            cond = str(pos.get("condition_id") or "")
+            token = str(pos.get("token_id") or "")
+            if not target_addr or not token:
+                continue
+            if self.store.target_shares(target_addr, token) > 1e-9:
+                continue
+            if self.store.pending_exit(target_addr, cond, token):
+                continue
+            market = self._market(cond)
+            if market and market.get("closed"):
+                continue
+            self.store.queue_pending_exit(
+                target=target_addr, condition_id=cond, token_id=token,
+                outcome=str(pos.get("outcome") or ""),
+                shares=float(pos["shares"]), reason="target_flat", ts=now,
+            )
+            queued += 1
+            self.log.warning(
+                "STRICT EXIT queued orphan %-8s sh=%.4f target_flat %s",
+                target_addr[:10], float(pos["shares"]),
+                str(pos.get("title") or "")[:50],
+            )
+        if queued:
+            self.store.commit()
+        return queued
 
     # ------------------------------------------------------------------ helpers
     def _skip(self, target: TargetConfig, row: dict[str, Any], reason: str, *,
@@ -438,6 +702,14 @@ class Engine:
                 continue
             if max(values) < 0.99 or min(values) > 0.01:
                 continue
+            if self.executor.is_live:
+                if not self.cfg.live.redeem:
+                    continue
+                if not self.executor.redeem(cond):
+                    self.log.warning(
+                        "SETTLE PENDING redeem failed/unavailable %s;"
+                        " position stays claimable", cond[:10])
+                    continue
             winner = outcomes[values.index(max(values))]
             for pos in self.store.positions_for_condition(cond):
                 payout = 1.0 if _norm(pos.get("outcome")) == _norm(winner) else 0.0

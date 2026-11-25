@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from ..config import AppConfig, load_config
+from ..config import AppConfig, RunConfig, load_config
 from . import auth, config_io, queries
 
 WEB_DIR = Path(__file__).resolve().parent
@@ -185,19 +185,26 @@ def _load_cfg() -> AppConfig | None:
         return None
 
 
-def _bot_online() -> tuple[bool, int | None]:
+def _bot_online() -> tuple[bool, int | None, str | None, str | None]:
     conn = queries.connect()
     try:
         heartbeat = queries.kv_int(conn, "bot_heartbeat")
+        mode = queries.kv_str(conn, "execution_mode")
+        dry_run = queries.kv_str(conn, "execution_dry_run")
     finally:
         queries.close(conn)
     online = bool(heartbeat and time.time() - heartbeat <= 90)
-    return online, heartbeat
+    return online, heartbeat, mode, dry_run
 
 
 def _render(request: Request, name: str, page: str, **ctx: Any) -> HTMLResponse:
     session = auth.current_session(request)
-    online, heartbeat = _bot_online()
+    online, heartbeat, db_mode, db_dry = _bot_online()
+    cfg = _load_cfg()
+    configured_mode = cfg.run.mode if cfg else "unknown"
+    actual_mode = db_mode or configured_mode
+    dry_run = (db_dry == "1") if db_dry is not None else (
+        cfg.live.dry_run if cfg else True)
     context = {
         "request": request,
         "page": page,
@@ -206,6 +213,10 @@ def _render(request: Request, name: str, page: str, **ctx: Any) -> HTMLResponse:
         "bot_online": online,
         "bot_heartbeat": heartbeat,
         "asset_version": ASSET_VERSION,
+        "run_mode": actual_mode,
+        "live_dry_run": dry_run,
+        "config_mode": configured_mode,
+        "mode_mismatch": bool(db_mode and db_mode != configured_mode),
     }
     context.update(ctx)
     return templates.TemplateResponse(request=request, name=name, context=context)
@@ -381,7 +392,7 @@ def signals(request: Request, copied: str = "", reason: str = "", page: int = 1)
 
 
 @app.get("/config", response_class=HTMLResponse)
-def config_page(request: Request, saved: str = ""):
+def config_page(request: Request, saved: str = "", mode_changed: str = ""):
     redirect = _login_redirect(request)
     if redirect:
         return redirect
@@ -397,8 +408,9 @@ def config_page(request: Request, saved: str = ""):
     return _render(
         request, "config.html", "config", cfg=cfg, target_name=name,
         target=cfg.targets[name], csrf=session.csrf if session else "",
-        saved=bool(saved), error=None, config_path=str(queries.CONFIG_PATH),
-        db_path=str(queries.DB_PATH),
+        saved=bool(saved), mode_changed=bool(mode_changed), error=None,
+        config_path=str(queries.CONFIG_PATH), db_path=str(queries.DB_PATH),
+        run=cfg.run, live=cfg.live,
     )
 
 
@@ -434,6 +446,10 @@ def _fint(form: Any, key: str, default: int, errors: list[str],
     if hi is not None and value > hi:
         errors.append(f"{label}不能大于 {hi}")
     return value
+
+
+def _fbool(form: Any, key: str) -> bool:
+    return str(form.get(key) or "").strip().lower() in ("1", "on", "true", "yes")
 
 
 def _flist(form: Any, key: str) -> list[str]:
@@ -473,6 +489,53 @@ async def config_save(request: Request):
         max_pages=_fint(form, "paper.max_pages", cfg.paper.max_pages, errors, "最大分页数", 1, 50),
         page_limit=_fint(form, "paper.page_limit", cfg.paper.page_limit, errors, "每页条数", 50, 1000),
     )
+
+    mode = str(form.get("run.mode") or cfg.run.mode).strip().lower()
+    if mode not in ("paper", "live"):
+        errors.append("运行模式必须是 paper 或 live")
+        mode = cfg.run.mode
+    run_cfg = RunConfig(mode=mode)
+    live = replace(
+        cfg.live,
+        dry_run=_fbool(form, "live.dry_run"),
+        private_key_env=str(form.get("live.private_key_env") or "").strip(),
+        funder=str(form.get("live.funder") or "").strip(),
+        signature_type=_fint(form, "live.signature_type", cfg.live.signature_type,
+                             errors, "实盘签名类型", 0, 2),
+        max_order_usd=_fnum(form, "live.max_order_usd", cfg.live.max_order_usd,
+                            errors, "实盘单笔上限", 0.01, 1e9),
+        max_total_exposure_usd=_fnum(
+            form, "live.max_total_exposure_usd",
+            cfg.live.max_total_exposure_usd, errors, "实盘总敞口上限", 0, 1e9),
+        max_daily_loss_usd=_fnum(
+            form, "live.max_daily_loss_usd", cfg.live.max_daily_loss_usd,
+            errors, "实盘日亏损上限", 0, 1e9),
+        min_order_shares=_fnum(
+            form, "live.min_order_shares", cfg.live.min_order_shares,
+            errors, "实盘最小份额", 0, 1e6),
+        order_timeout_seconds=_fint(
+            form, "live.order_timeout_seconds", cfg.live.order_timeout_seconds,
+            errors, "实盘订单超时", 1, 3600),
+        kill_switch_path=str(form.get("live.kill_switch_path")
+                             or cfg.live.kill_switch_path).strip(),
+        redeem=_fbool(form, "live.redeem"),
+        max_book_depth_pct=_fnum(
+            form, "live.max_book_depth_pct", cfg.live.max_book_depth_pct,
+            errors, "盘口深度占比", 0, 1),
+        db_path=str(form.get("live.db_path") or cfg.live.db_path).strip(),
+        log_path=str(form.get("live.log_path") or cfg.live.log_path).strip(),
+    )
+    try:
+        live.validate()
+    except ValueError as exc:
+        errors.append(str(exc))
+    if live.db_path == paper.db_path:
+        errors.append("实盘数据库不能与纸盘数据库相同，请设置独立的 live.db_path")
+    if mode == "live" and not live.dry_run:
+        if not live.funder:
+            errors.append("实盘非 dry-run 必须填写 funder 钱包")
+        if not live.private_key_env:
+            errors.append("实盘非 dry-run 必须填写私钥环境变量名")
 
     fee_override_raw = str(form.get("target.fee_rate", "")).strip()
     fee_override: float | None = None
@@ -515,14 +578,16 @@ async def config_save(request: Request):
         errors.append("目标最小成交额不能高于最大成交额")
 
     new_cfg = AppConfig(
-        account=cfg.account, paper=paper, targets={name: new_target}, path=cfg.path
+        account=cfg.account, paper=paper, run=run_cfg, live=live,
+        targets={name: new_target}, path=cfg.path,
     )
     if errors:
         return _render(
             request, "config.html", "config", cfg=new_cfg, target_name=name,
             target=new_target, csrf=session.csrf, saved=False,
-            error="；".join(errors), config_path=str(queries.CONFIG_PATH),
-            db_path=str(queries.DB_PATH),
+            mode_changed=False, error="；".join(errors),
+            config_path=str(queries.CONFIG_PATH),
+            db_path=str(queries.DB_PATH), run=run_cfg, live=live,
         )
     try:
         config_io.save_config(new_cfg, queries.CONFIG_PATH)
@@ -530,10 +595,13 @@ async def config_save(request: Request):
         return _render(
             request, "config.html", "config", cfg=new_cfg, target_name=name,
             target=new_target, csrf=session.csrf, saved=False,
-            error=f"保存失败：{exc}", config_path=str(queries.CONFIG_PATH),
-            db_path=str(queries.DB_PATH),
+            mode_changed=False, error=f"保存失败：{exc}",
+            config_path=str(queries.CONFIG_PATH),
+            db_path=str(queries.DB_PATH), run=run_cfg, live=live,
         )
-    return RedirectResponse("/config?saved=1", status_code=303)
+    restart = (run_cfg != cfg.run or live != cfg.live)
+    suffix = "&mode_changed=1" if restart else ""
+    return RedirectResponse(f"/config?saved=1{suffix}", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -542,12 +610,14 @@ async def config_save(request: Request):
 
 @app.get("/api/health")
 def api_health():
-    online, heartbeat = _bot_online()
+    online, heartbeat, mode, dry_run = _bot_online()
     return {
         "status": "ok",
         "ts": int(time.time()),
         "bot_online": online,
         "bot_heartbeat": heartbeat,
+        "execution_mode": mode,
+        "execution_dry_run": dry_run,
         "db_exists": queries.DB_PATH.exists(),
     }
 

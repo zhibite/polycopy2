@@ -47,7 +47,12 @@ class DataApi:
         return rows
 
     def open_positions(self, user: str, limit: int = 500,
-                       max_pages: int = 10) -> list[dict[str, Any]]:
+                       max_pages: int = 10) -> list[dict[str, Any]] | None:
+        """Current open positions, or None when the API could not be read.
+
+        Used only for target-ledger reconciliation (not as a signal source).
+        Rows carry ``current_size`` (the live field; ``size`` is legacy).
+        """
         params = {"user": user, "status": "OPEN", "limit": limit}
         rows: list[dict[str, Any]] = []
         cursor = None
@@ -57,7 +62,7 @@ class DataApi:
                 page["cursor"] = cursor
             body = self.http.get_json(DATA_API + "/positions", page)
             if not isinstance(body, dict):
-                break
+                return None
             data = body.get("data") or []
             rows.extend(data)
             pag = body.get("pagination") or {}

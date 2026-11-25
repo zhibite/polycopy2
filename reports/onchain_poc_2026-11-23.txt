@@ -1,0 +1,169 @@
+POLYCOPY ON-CHAIN SIGNAL SOURCE PoC
+2026-11-23
+
+1. PHASE 1 - DECODE VERIFICATION
+
+Event: Polymarket CTF Exchange V2 OrderFilled
+  CTFExchangeV2       0xE111180000d2663C0091e4f400237545B87B996B
+  NegRiskCtfExchange  0xe2222d279d744050d28e00520010520000310F59
+
+Mapping used (maker perspective):
+  BUY  size = takerAmount/1e6, gross = makerAmount/1e6, cash = gross + fee
+  SELL size = makerAmount/1e6, gross = takerAmount/1e6, cash = gross - fee
+  price = gross / size (matches data-api price)
+  timestamp = block timestamp (matches data-api timestamp)
+
+Target wallet 0xf705fa045201391d9632b7f3cde06a5e24453ca7:
+  50 data-api trades / 50 txs / 50 own-order events
+  matched 50, passed 50, failed 0
+  max |size diff|  0.0
+  max |price diff| 4.85e-11
+  max |usdc diff|  0.0
+  timestamp mismatches 0, condition mismatches 0
+  artifact: reports/onchain_verify_f705_50.json
+
+High-frequency maker wallet 0xeee92f1cc6d6e0ad0b4ffda20b01cf3678e27ecb:
+  20 data-api trades / 18 txs (multiple fills in some txs)
+  matched 20, passed 20
+  max |price diff| 4.65e-11
+  artifact: reports/onchain_verify_eee9_20.json
+
+2. PHASE 2 - PARALLEL PAPER RUN
+
+Deployed:
+  data-api bot (existing): /root/polycopy, DB data/paper_f705.db
+  on-chain bot (new):      /root/polycopy-onchain, DB data/paper_f705_onchain.db
+  on-chain PID file:       /root/polycopy-onchain/data/onchain.pid
+  trace:                   /root/polycopy-onchain/data/onchain_trace.jsonl
+
+Source path:
+  drpc WSS eth_subscribe(logs) filtered by both V2 exchanges and maker topic
+  -> decode OrderFilled -> CLOB token metadata (cached)
+  -> data-api-shaped row -> Engine.ingest_rows() (same rules/paper execution)
+
+Reliability:
+  - HTTP eth_getLogs catch-up every 15s even while subscribed
+  - reconnect + catch-up on WebSocket loss
+  - catchup_chunk=100 (drpc free plan rejects ranges over 100 blocks)
+  - cursor kv onchain:last_block persisted only after queue drain
+  - in-process dedupe (tx_hash, log_index); DB dedupe key identical to data-api
+  - automatic HTTP polling fallback with --no-ws / missing websockets
+  - drpc primary, publicnode fallback (drpc 30/30 vs publicnode 28/30 in probe)
+  - settle/mark run on a separate SQLite connection in a background thread, so
+    book walks cannot block signal handling; fills are processed by the main
+    loop only
+
+Live status at 2026-11-23 10:46 UTC (final restart after fixes):
+  connected=True, block ~97816858, queue=0, processed=0, errors=0
+  no f705 fills since 09:45 UTC; waiting for the next trade
+  data-api bot last signal 09:45:17 UTC (its recent latency: 3-20 s)
+
+Live WebSocket smoke (high-frequency wallet 0xeee9, temp DB, 10:30 UTC):
+  block 97816252 received with feed_delay -0.30 s (block timestamp ahead of
+  wall clock); copy latency 0.36 s; paper BUY filled at 0.101 vs target 0.10.
+  This exercised the real subscription -> decode -> metadata -> engine path,
+  not a catch-up replay.
+
+Controlled data-api lag probe (0xeee9, one fill, 75 s):
+  the data-api activity row became queryable 1.32 s after the block timestamp
+  (2.48 s after our WebSocket receipt). The existing bot's recorded 3-20 s
+  latency is therefore dominated by its 5 s poll cadence, API call time and
+  processing, not by data-api indexing alone. Sample size is 1; the live
+  f705 comparison will provide the distribution.
+
+3. COMPARISON COMMAND
+
+  /root/polycopy/.venv/bin/python \
+    /root/polycopy-onchain/scripts/compare_sources.py \
+    /root/polycopy/data/paper_f705.db \
+    /root/polycopy-onchain/data/paper_f705_onchain.db \
+    --verbose --json-out /root/polycopy-onchain/data/compare.json
+
+Compares matched (tx, side, token) signals: latency, chain lead, adverse
+slippage vs target fill, and one-sided signals. Pre-start data-api signals are
+excluded automatically via the on-chain account creation time.
+
+4. KNOWN GAP BEFORE PROMOTION
+
+  The feed subscribes to OrderFilled only. f705 has REDEEM/MERGE/SPLIT
+  activity; the target share ledger will drift after those events, which
+  changes SELL fraction sizing. The PoC seeded target_positions from the
+  data-api DB once. Before replacing the main link, add CTF
+  PayoutRedemption / PositionsMerge / PositionSplit logs or a periodic
+  positions reconciliation.
+
+5. NEXT
+
+  Let both run >= 24 h. Promote to the main link only if the gates in
+  docs/onchain_poc.md are met. Keep data-api as a shadow/fallback; the dedupe
+  key is shared, so both sources can write to one DB without double-copying.
+
+6. SIZING CHANGE AND MONITORING (2026-11-23 11:37 UTC)
+
+  At the user's direction:
+    scale_factor 0.01 -> 0.05
+    max_notional_usd 100 -> 500
+  Both paper processes hot-reloaded the config (A at 11:37:14, B at 11:37:12).
+
+  New monitoring (read-only; does not change trading logic):
+    scripts/exposure_monitor.py  -> data/exposure.jsonl every 60 s for both DBs
+      fields: open_positions, open_conditions, invested, market_value, cash,
+      equity, realized_pnl, cash_utilization, max_market_exposure
+    scripts/bucket_report.py     -> per-bucket slippage / skip reasons / exposure
+      edge budgets from f705 one-sided sample:
+        30-50c +18.3c, 50-60c +12.1c, 60-70c +6.1c (fee-inclusive target VWAP)
+      60-70c warning if median slip > 2c, p90 > 4c, or net_med <= 0.
+
+  Initial report (11:39 UTC):
+    data-api: 20 signals, 2 copied (both >70c from the old filter);
+              >70c median slip 0.17c, p90 0.71c; no 30-70c copies yet.
+    on-chain: 0 signals, 0 exposure.
+    data-api current exposure: 2 positions, invested $41.64, utilization 0.4%.
+
+  Risk caps unchanged: max_market_usd=500, max_open_positions=300,
+  cash_reserve_pct=5%.  At 5% these will bind more often; watch
+  insufficient_cash / max_market_exposure skip counts and cash utilization.
+
+  B (on-chain) logs now include pre-trade exposure on every fill:
+    COPY BUY/SELL ... open=N mkt=$X cash=$Y ...
+    THIN-EDGE 60-70c buy target=... our=... slip=±N.NNc open=... mkt=... cash=...
+  A's old process keeps its existing log format; its slippage is still
+  derivable from signals.price/our_price and its exposure from the monitor.
+
+  Details: docs/sizing_5pct.md
+
+7. FIRST LIVE MATCHED SIGNAL (2026-11-23 11:45:29 UTC)
+
+  tx 0xe7963fe4d1e04133ea16283d23100b2ccf6757e382bc8a9830e3d0105a8e9160
+  SELL 800 @ 0.98301875, $786.28 (Will Bitcoin dip to $45,000 in November?)
+  data-api latency 6.819 s; on-chain latency 0.295 s; lead 6.524 s
+  on-chain trace: feed_delay -0.070 s, queue_delay 0.365 s, handle 0.015 s
+  both skipped target_no_position (no paper position in that token)
+  dedupe keys are byte-identical across sources
+  compare_sources.py: matched=1, only_data_api=0, only_onchain=0
+  No 30-70c BUY has arrived yet, so the 5% sizing and 60-70c slippage
+  sample are still pending.
+
+8. FIRST 30-50c COPIED BUY AT 5% (2026-11-23 14:10:35 UTC)
+
+  Target: BUY 552.342858 @ 0.3402777772, $189.18994
+          "Will Bitcoin reach $67,500 in November?"
+  5% budget: $9.4595 -> 27.799338 shares
+  data-api: latency 2.091 s, fill 0.3628056, notional $10.0858,
+            fee $0.4499, adverse slip +2.25 c/share
+  on-chain: latency 0.044 s, fill 0.3557047, notional $9.8884,
+            fee $0.4460, adverse slip +1.54 c/share
+  On-chain better by 0.71 c/share; total cost $10.334 vs $10.536.
+  30-50c bucket report: data-api net_med 14.43 c, on-chain net_med 15.15 c
+  (historical edge budget 18.3 c). Both "ok" after fixing the flag logic to
+  apply the 2c/4c thresholds only to the thin 60-70c bucket.
+
+  Comparison over 35 matched post-restart signals:
+    matched 35, only_data_api 0, only_onchain 0
+    data-api latency median 9.421 s, p90 19.074 s
+    on-chain latency median 0.044 s, p90 0.964 s
+    on-chain lead median 9.421 s, p90 19.074 s
+    both copied 1, slippage improvement 0.71 c/share
+  60-70c: 0 signals. 50-60c: 1 signal, both skipped "drift".
+  Exposure: data-api 3 positions / $52.18 / 0.5% utilization;
+            on-chain 1 position / $10.33 / 0.1% utilization.

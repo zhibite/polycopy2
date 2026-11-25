@@ -16,6 +16,9 @@
   <a href="/signals" class="{{ 'active' if page == 'signals' else '' }}">跟单信号</a>
   <a href="/config" class="{{ 'active' if page == 'config' else '' }}">策略配置</a>
   <div class="nav-right">
+    <span class="mode-badge {{ 'mode-live' if run_mode == 'live' else 'mode-paper' }}">
+      {{ '实盘' if run_mode == 'live' else '纸盘' }}{% if run_mode == 'live' and live_dry_run %} · DRY RUN{% endif %}{% if mode_mismatch %} · 待重启{% endif %}
+    </span>
     <span class="live-dot {{ '' if bot_online else 'offline' }}"></span>
     <span>{{ '引擎在线' if bot_online else '引擎离线' }}</span>
     <span id="clock" class="mono">{{ now_bj }}</span>
@@ -31,7 +34,8 @@
 </div>
 
 <footer>
-  PolyCopy · 纸盘跟单 · 时间为北京时间 (UTC+8)
+  PolyCopy · {{ '实盘' if run_mode == 'live' else '纸盘' }}{% if run_mode == 'live' and live_dry_run %} (DRY RUN){% endif %}
+  · 时间为北京时间 (UTC+8)
   {% if bot_heartbeat %} · 引擎心跳 {{ bot_heartbeat|dt_bj }}{% endif %}
 </footer>
 

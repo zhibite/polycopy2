@@ -1,0 +1,207 @@
+==============================================================================
+f705 LAST 30 DAYS  2026-10-24 02:20 .. 2026-11-23 02:20 UTC
+==============================================================================
+
+--- PROFIT (economic PnL, Polymarket pnl history) -------------------
+  window base point          : 2026-10-24 03:00
+  window end point           : 2026-11-23 02:00
+  economic PnL               : $599.6K
+  trade PnL                  : $639.1K
+  realized market PnL        : $665.0K
+  unrealized PnL change      : $-86.6K
+  fees                       : $-60.6K
+  taker rebate               : $19.2K
+  maker rebate               : $0.00
+  fees refunded              : $0.00
+  yield income               : $2.0K
+  volume                     : $10.17M
+  trade count                : 6,135
+  PnL / volume               : 5.90%
+  unrealized PnL now         : $-9.3K
+  max drawdown in window     : $-88.0K  (2026-10-24 16:00 peak -> 2026-10-29 17:00)
+
+  daily economic PnL / volume / trades:
+    2026-10-24  pnl     $35.7K  volume    $205.9K  trades     157
+    2026-10-25  pnl     $-2.0K  volume    $164.1K  trades      97
+    2026-10-26  pnl     $11.5K  volume    $168.4K  trades      75
+    2026-10-27  pnl    $-20.0K  volume    $195.8K  trades      55
+    2026-10-28  pnl    $-31.5K  volume    $471.6K  trades     162
+    2026-10-29  pnl    $130.1K  volume    $732.1K  trades     397
+    2026-10-30  pnl     $60.9K  volume    $819.4K  trades     517
+    2026-10-31  pnl    $-17.4K  volume    $119.5K  trades      65
+    2026-11-01  pnl     $-6.9K  volume    $170.1K  trades     149
+    2026-11-02  pnl      $5.2K  volume    $218.4K  trades     146
+    2026-11-03  pnl     $-1.5K  volume     $59.1K  trades      46
+    2026-11-04  pnl      $3.1K  volume    $359.8K  trades     198
+    2026-11-05  pnl     $57.6K  volume    $448.5K  trades     286
+    2026-11-06  pnl    $-26.2K  volume    $505.5K  trades     388
+    2026-11-07  pnl      $7.8K  volume     $76.5K  trades      38
+    2026-11-08  pnl     $13.1K  volume    $308.4K  trades     182
+    2026-11-09  pnl    $-10.7K  volume    $181.7K  trades      79
+    2026-11-10  pnl     $30.4K  volume    $232.8K  trades     126
+    2026-11-11  pnl    $-14.1K  volume    $106.5K  trades      69
+    2026-11-12  pnl     $72.9K  volume    $294.8K  trades     163
+    2026-11-13  pnl     $70.8K  volume    $577.9K  trades     412
+    2026-11-14  pnl    $173.0K  volume    $886.9K  trades     461
+    2026-11-15  pnl    $-25.4K  volume    $760.7K  trades     424
+    2026-11-16  pnl      $1.7K  volume    $115.7K  trades      44
+    2026-11-17  pnl     $-3.3K  volume     $68.0K  trades      69
+    2026-11-18  pnl     $12.9K  volume    $191.5K  trades     114
+    2026-11-19  pnl      $8.4K  volume    $360.6K  trades     204
+    2026-11-20  pnl     $24.9K  volume    $401.8K  trades     394
+    2026-11-21  pnl     $35.4K  volume    $716.2K  trades     389
+    2026-11-22  pnl      $5.1K  volume    $196.7K  trades     187
+    2026-11-23  pnl     $-1.9K  volume     $53.7K  trades      42
+  best days                  : 2026-11-14 $173.0K, 2026-10-29 $130.1K, 2026-11-12 $72.9K
+  worst days                 : 2026-11-15 $-25.4K, 2026-11-06 $-26.2K, 2026-10-28 $-31.5K
+  positive days              : 19/31 (61.3%)
+
+  weekly buckets:
+    2026-W43  pnl     $33.7K  volume    $370.1K  trades     254
+    2026-W44  pnl    $126.7K  volume     $2.68M  trades   1,420
+    2026-W45  pnl     $59.1K  volume     $1.98M  trades   1,284
+    2026-W46  pnl    $296.9K  volume     $3.04M  trades   1,734
+    2026-W47  pnl     $85.0K  volume     $2.05M  trades   1,401
+    2026-W48  pnl     $-1.9K  volume     $53.7K  trades      42
+
+--- TRADING BEHAVIOUR IN WINDOW ------------------------------------
+  activity rows              : 6,663  TRADE=6140 REDEEM=315 MERGE=148 YIELD=30 TAKER_REBATE=30
+  trade fills                : 6,140  (204.7/day)
+  BUY fills                  : 4,129  $3.14M
+  SELL fills                 : 2,011  $1.51M
+  trade cash (buy+sell)      : $4.65M
+  distinct conditions        : 432
+  distinct events            : 48
+  outcomes                   : Yes=3613 No=2527
+  fill notional              : p10 $14.60  p25 $46.76  p50 $195.84  p75 $684.29  p90 $2.0K  p99 $9.0K  max $10.0K
+  fill shares                : p50 718  p90 4,307  max 11,000
+  fill notional buckets:
+    <$10         411 ( 6.7%)  volume      $2.2K
+    $10-50     1,203 (19.6%)  volume     $32.8K
+    $50-100      727 (11.8%)  volume     $52.2K
+    $100-500   1,913 (31.2%)  volume    $499.6K
+    $500-1K      749 (12.2%)  volume    $539.2K
+    $1K-5K       946 (15.4%)  volume     $2.06M
+    >$5K         191 ( 3.1%)  volume     $1.47M
+  BUY price distribution (by count / by USD):
+      0-  5c      670 (16.2%)  USD     $38.6K ( 1.2%)
+      5- 15c      852 (20.6%)  USD    $140.4K ( 4.5%)
+     15- 30c      541 (13.1%)  USD    $195.2K ( 6.2%)
+     30- 50c      231 ( 5.6%)  USD    $159.8K ( 5.1%)
+     50- 70c      155 ( 3.8%)  USD    $135.9K ( 4.3%)
+     70- 85c      446 (10.8%)  USD    $433.0K (13.8%)
+     85- 95c      667 (16.2%)  USD    $982.7K (31.3%)
+     95-100c      567 (13.7%)  USD     $1.06M (33.7%)
+  share-weighted avg BUY px  : 0.4365
+  SELL price distribution (by count):
+      0-  5c      370 (18.4%)
+      5- 15c      301 (15.0%)
+     15- 30c      243 (12.1%)
+     30- 50c      145 ( 7.2%)
+     50- 70c      179 ( 8.9%)
+     70- 85c      189 ( 9.4%)
+     85- 95c      336 (16.7%)
+     95-100c      248 (12.3%)
+  fills by UTC hour          : 00=284 01=244 02=484 03=265 04=206 05=147 06=154 07=176 08=205 09=154 10=115 11=150 12=184 13=210 14=394 15=667 16=464 17=214 18=168 19=158 20=237 21=334 22=295 23=231
+  fills by weekday           : Fri=1660 Thu=1130 Sat=1106 Sun=1076 Wed=549 Mon=321 Tue=298
+  asset mix by volume        : Bitcoin $2.69M (57.8%, 3492 fills)  Ethereum $1.48M (31.9%, 1812 fills)  Solana $343.0K (7.4%, 466 fills)  XRP $134.2K (2.9%, 343 fills)  Dogecoin $4.0K (0.1%, 27 fills)
+  top events by volume:
+    15.0%    $699.2K  fills   712  what-price-will-bitcoin-hit-in-november-2026
+     9.3%    $434.8K  fills   414  what-price-will-bitcoin-hit-before-2027
+     8.2%    $380.3K  fills   370  what-price-will-ethereum-hit-in-november-2026
+     8.0%    $373.4K  fills   191  what-price-will-ethereum-hit-before-2027
+     6.4%    $297.4K  fills   264  what-price-will-bitcoin-hit-in-october-2026
+     4.1%    $193.1K  fills   220  bitcoin-above-on-november-20-2026
+     4.1%    $191.7K  fills   167  what-price-will-solana-hit-in-november-2026
+     4.0%    $186.9K  fills   211  what-price-will-ethereum-hit-in-october-2026
+     3.6%    $169.3K  fills   293  what-price-will-bitcoin-hit-november-16-22-2026
+     3.3%    $154.3K  fills   217  bitcoin-above-on-october-30-2026
+  top markets by volume:
+     3.1%    $142.9K  fills    97  Will Bitcoin dip to $55,000 by December 31, 2026?
+     2.1%     $98.5K  fills    69  Will Ethereum dip to $1,500 by December 31, 2026?
+     2.1%     $97.7K  fills    93  Will Bitcoin dip to $77,500 in November?
+     2.1%     $96.8K  fills    43  Will Ethereum dip to $1,750 by December 31, 2026?
+     2.0%     $92.2K  fills    64  Will Bitcoin dip to $75,000 in October?
+     1.8%     $82.2K  fills    58  Will Solana dip to $70 in November?
+     1.7%     $76.8K  fills    51  Will the price of Bitcoin be above $80,000 on October 30?
+     1.5%     $71.7K  fills    19  Will Ethereum dip to $1,250 by December 31, 2026?
+     1.5%     $70.3K  fills    26  Will Bitcoin reach $82,500 in October?
+     1.2%     $58.1K  fills    66  Will the price of Bitcoin be above $76,000 on November 6?
+     1.2%     $57.7K  fills    22  Will Solana dip to $50 in November?
+     1.2%     $56.2K  fills    83  Will Bitcoin dip to $67,500 in November?
+  conditions with BUY on both outcomes: 114/432 (26.4%)
+
+  COPY-SIGNAL PROFILE (BUY 30-70c, target >= $20):
+    signals                  : 377  (12.6/day)
+    target notional          : $301.2K
+    our notional at 1%       : $3.2K  median $2.93
+    avg BUY price in band    : 0.4589
+    share of all BUY fills   : 9.1% count / 9.6% USD
+
+--- CLOSED POSITIONS CLOSED IN WINDOW ------------------------------
+  positions closed           : 440
+  realized PnL               : $625.1K
+  win rate                   : 43.4%  (191W / 249L)
+  avg / median win           : $5.2K / $684.95
+  avg / median loss          : $-1.5K / $-352.20
+  profit factor              : 2.69
+  hold hours (first->close)  : p25 32.8  median 98.6  p75 162.1  p90 637.9
+  PnL by avg entry price:
+    0-30c    n= 228  pnl    $167.0K  win  25.9%  avg $732.56
+    30-50c   n=  25  pnl    $339.2K  win  72.0%  avg $13.6K
+    50-70c   n=  18  pnl     $14.3K  win  77.8%  avg $794.52
+    70-85c   n=  29  pnl    $107.2K  win  65.5%  avg $3.7K
+    85-95c   n=  47  pnl      $4.9K  win  51.1%  avg $105.11
+    95-100c  n=  93  pnl     $-7.5K  win  61.3%  avg $-80.85
+  PnL by asset:
+    Ethereum   n= 145  pnl    $349.4K  win  44.1%
+    Bitcoin    n= 196  pnl    $280.9K  win  44.9%
+    Solana     n=  55  pnl     $26.9K  win  40.0%
+    Dogecoin   n=   7  pnl      $2.5K  win  71.4%
+    XRP        n=  37  pnl    $-34.5K  win  32.4%
+  best closed positions:
+        $98.1K  Yes  avg 0.364  Will Ethereum dip to $1,750 by December 31, 2026?
+        $91.3K  Yes  avg 0.486  Will Ethereum dip to $2,250 by December 31, 2026?
+        $69.1K  Yes  avg 0.419  Will Ethereum dip to $2,000 by December 31, 2026?
+        $56.2K  Yes  avg 0.262  Will Bitcoin dip to $77,500 in October?
+        $40.8K  Yes  avg 0.094  Will Bitcoin dip to $64,000 November 9-15?
+        $39.8K  Yes  avg 0.194  Will Ethereum dip to $2,200 in October?
+        $25.5K  Yes  avg 0.329  Will Bitcoin dip to $65,000 by December 31, 2026?
+        $23.8K  Yes  avg 0.448  Will Bitcoin dip to $70,000 by December 31, 2026?
+        $21.5K  Yes  avg 0.723  Will Bitcoin dip to $67,500 in November?
+        $21.1K  Yes  avg 0.142  Will Bitcoin dip to $66,000 November 9-15?
+  worst closed positions:
+       $-44.9K  Yes  avg 0.425  Will Bitcoin reach $85,000 in October?
+       $-20.9K  No   avg 0.903  Will Ethereum dip to $1,600 in November?
+       $-19.6K  No   avg 0.506  Will XRP dip to $1.00 in November?
+       $-17.7K  Yes  avg 0.051  Will Bitcoin reach $87,500 in October?
+       $-15.6K  Yes  avg 0.756  Will Ethereum dip to $1,500 by December 31, 2026?
+       $-12.1K  Yes  avg 0.341  Will Bitcoin dip to $62,000 November 9-15?
+       $-10.5K  No   avg 0.747  Will Bitcoin dip to $74,000 November 2-8?
+        $-8.8K  No   avg 0.878  Will Ethereum dip to $1,700 in November?
+        $-8.7K  Yes  avg 0.124  Will Ethereum reach $2,500 in October?
+        $-7.9K  Yes  avg 0.702  Will the price of XRP be above $1.20 on November 6?
+  close path flags           : SELL/closed=403 MERGE=36 ?=1
+
+  open positions opened in window: 97  cost $393.4K  unrealized $-12.0K
+
+--- OPEN BOOK NOW ---------------------------------------------------
+  open positions             : 184
+  cost / current / unrealized: $1.15M / $1.14M / $-2.1K
+  largest open positions:
+       $75.9K  avg 0.904 -> 0.755  No    Will Ethereum dip to $1,250 by December 31, 2026?
+       $55.8K  avg 0.925 -> 0.987  No    Bitcoin all time high by December 31, 2026?
+       $49.1K  avg 0.885 -> 0.990  No    Will Bitcoin reach $120,000 by December 31, 2026?
+       $41.6K  avg 0.919 -> 0.902  No    Will Bitcoin dip to $50,000 in November?
+       $36.9K  avg 0.975 -> 0.998  No    Will Solana reach $600 by December 31, 2026?
+       $32.2K  avg 0.684 -> 0.535  Yes   Will Bitcoin dip to $55,000 by December 31, 2026?
+       $31.3K  avg 0.754 -> 0.985  No    Will Ethereum reach $3,500 by December 31, 2026?
+       $29.6K  avg 0.970 -> 0.973  No    Will Ethereum reach $2,600 in November?
+       $28.9K  avg 0.891 -> 0.988  No    Will Bitcoin reach $110,000 by December 31, 2026?
+       $28.4K  avg 0.924 -> 0.940  No    Will Ethereum dip to $1,300 in November?
+
+--- LAST 24H ---------------------------------------------------------
+  fills                      : 194  volume $98.3K
+  BUY / SELL                 : 106 / 88
+  last fill                  : 2026-11-23 02:20
+  last fill detail           : SELL No @ 0.773  Will Ethereum dip to $1,500 in November?
