@@ -100,7 +100,13 @@
           <tr>
             <td class="mono">{{ s.ts|dt_bj }}</td>
             <td><span class="pill {{ 'buy' if s.side == 'BUY' else 'sell' }}">{{ '买入' if s.side == 'BUY' else '卖出' }}</span></td>
-            <td title="{{ s.title }}">{{ (s.title or s.condition_id)|short_title(52) }}</td>
+            <td title="{{ s.title }}">
+              {% if s.event_slug %}
+                <a class="market-link" href="{{ s.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ (s.title or s.condition_id)|short_title(52) }}</a>
+              {% else %}
+                {{ (s.title or s.condition_id)|short_title(52) }}
+              {% endif %}
+            </td>
             <td>{{ s.outcome or '--' }}</td>
             <td class="mono">{{ s.price|price }}</td>
             <td class="mono">{{ s.usd|money }}</td>

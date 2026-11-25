@@ -104,7 +104,13 @@
           {% set mark = p.mark_mid if p.mark_mid is not none else p.avg_cost %}
           {% set upnl = p.shares * (mark - p.avg_cost) %}
           <tr>
-            <td title="{{ p.title }}">{{ p.title|short_title(62) }}</td>
+            <td title="{{ p.title }}">
+              {% if p.event_slug %}
+                <a class="market-link" href="{{ p.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ p.title|short_title(62) }}</a>
+              {% else %}
+                {{ p.title|short_title(62) }}
+              {% endif %}
+            </td>
             <td><span class="pill {{ 'buy' if (p.outcome or '')|lower in ['yes','up'] else 'sell' }}">{{ p.outcome or '--' }}</span></td>
             <td class="mono">{{ p.shares|num(2) }}</td>
             <td class="mono">{{ (p.shares * p.avg_cost)|money }}</td>
@@ -134,7 +140,13 @@
           <tr>
             <td class="mono">{{ f.ts|dt_bj }}</td>
             <td><span class="pill {{ 'buy' if f.side == 'BUY' else 'sell' }}">{{ '买入' if f.side == 'BUY' else '卖出' }}</span></td>
-            <td title="{{ f.title }}">{{ (f.title or f.condition_id)|short_title(52) }}</td>
+            <td title="{{ f.title }}">
+              {% if f.event_slug %}
+                <a class="market-link" href="{{ f.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ (f.title or f.condition_id)|short_title(52) }}</a>
+              {% else %}
+                {{ (f.title or f.condition_id)|short_title(52) }}
+              {% endif %}
+            </td>
             <td>{{ f.outcome or '--' }}</td>
             <td class="mono">{{ f.price|price }}</td>
             <td class="mono">{{ f.shares|num(2) }}</td>

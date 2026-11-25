@@ -73,7 +73,13 @@
                 {{ '未平仓' if p.status == 'OPEN' else '已平仓' }}
               </span>
             </td>
-            <td title="{{ p.title }}">{{ p.title|short_title(60) }}</td>
+            <td title="{{ p.title }}">
+              {% if p.event_slug %}
+                <a class="market-link" href="{{ p.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ p.title|short_title(60) }}</a>
+              {% else %}
+                {{ p.title|short_title(60) }}
+              {% endif %}
+            </td>
             <td>{{ p.outcome or '--' }}</td>
             <td class="mono">{{ p.shares|num(2) }}</td>
             <td class="mono">{{ (p.shares * p.avg_cost)|money }}</td>

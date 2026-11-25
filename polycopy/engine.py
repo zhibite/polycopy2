@@ -29,6 +29,7 @@ class Engine:
         self._last_settle = 0
         self._last_mark = 0
         self._last_target_reconcile = 0
+        self._last_balance_sync = 0
         self._market_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._token_cache: dict[str, tuple[float, list[str]]] = {}
         self._cycles = 0
@@ -117,6 +118,14 @@ class Engine:
                 self._last_mark = now
             except Exception:
                 self.log.exception("marking failed")
+
+        if (self.executor.is_live and not self.cfg.live.dry_run
+                and now - self._last_balance_sync >= 60):
+            try:
+                self._sync_live_balance()
+            except Exception:
+                self.log.exception("live balance sync failed")
+            self._last_balance_sync = now
 
         self.store.set_kv("execution_mode",
                           "live" if self.executor.is_live else "paper")
@@ -471,6 +480,23 @@ class Engine:
             shares=shares, reason=reason, ts=int(time.time()),
         )
         self.store.commit()
+
+    # ------------------------------------------------------------ manual sells
+    def _sync_live_balance(self) -> None:
+        """Keep ledger cash equal to the CLOB collateral balance.
+
+        Positions are tracked separately, so equity remains cash + marks even
+        after a deposit or withdrawal.  P&L shown by the dashboard is based on
+        realized + unrealized, not equity - starting_cash, so deposits do not
+        look like profit.
+        """
+        balance = getattr(self.executor, "balance", lambda: None)()
+        if balance is None:
+            return
+        self.store.set_cash(float(balance))
+        self.store.set_kv("live_collateral_balance",
+                          f"{float(balance):.6f}")
+        self.log.info("LIVE BALANCE synced $%.2f", float(balance))
 
     # ------------------------------------------------------------ manual sells
     def process_manual_sells(self) -> int:

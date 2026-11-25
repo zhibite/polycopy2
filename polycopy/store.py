@@ -281,6 +281,13 @@ class Store:
             raise RuntimeError("account not initialised; call ensure_account()")
         return dict(row)
 
+    def set_cash(self, cash: float) -> None:
+        """Reconcile the ledger cash line with the live collateral balance."""
+        self.conn.execute(
+            "UPDATE account SET cash = ? WHERE id = 1",
+            (float(cash),),
+        )
+
     # ------------------------------------------------------------------- kv
     def get_kv(self, key: str, default: str | None = None) -> str | None:
         row = self.conn.execute("SELECT value FROM kv WHERE key = ?", (key,)).fetchone()

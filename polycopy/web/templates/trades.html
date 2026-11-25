@@ -88,7 +88,13 @@
                 <span class="pill sell">跟单卖出{% if f.note == 'strict_exit' %} · 强平{% elif f.note == 'reconciled' %} · 对账{% endif %}</span>
               {% endif %}
             </td>
-            <td title="{{ f.title }}">{{ (f.title or f.condition_id)|short_title(58) }}</td>
+            <td title="{{ f.title }}">
+              {% if f.event_slug %}
+                <a class="market-link" href="{{ f.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ (f.title or f.condition_id)|short_title(58) }}</a>
+              {% else %}
+                {{ (f.title or f.condition_id)|short_title(58) }}
+              {% endif %}
+            </td>
             <td>{{ f.outcome or '--' }}</td>
             <td class="mono">{{ f.price|price }}</td>
             <td class="mono">{{ f.shares|num(2) }}</td>

@@ -46,6 +46,11 @@ class StoreTest(unittest.TestCase):
         self.assertAlmostEqual(acc["realized_pnl"], 2.3904 - 4 * 0.5025 + 6 - 6 * 0.5025)
         self.assertEqual(self.store.count_open_positions(), 0)
 
+    def test_set_cash_reconciles_balance(self):
+        self.store.set_cash(499.190567)
+        self.store.commit()
+        self.assertAlmostEqual(self.store.account()["cash"], 499.190567)
+
     def test_target_ledger(self):
         self.store.add_target_shares("t", "c", "k", 100)
         self.assertAlmostEqual(self.store.target_shares("t", "k"), 100)

@@ -256,8 +256,10 @@ def summary(conn: sqlite3.Connection | None) -> dict[str, Any]:
 
     cash = float(acc.get("cash") or 0)
     starting = float(acc.get("starting_cash") or 0)
+    realized = float(acc.get("realized_pnl") or 0)
     equity = cash + market_value
-    total_pnl = equity - starting
+    # Deposits/withdrawals change equity but are not trading P&L.
+    total_pnl = realized + unrealized
 
     today_start = int(
         datetime.now(BJ).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
@@ -302,7 +304,7 @@ def summary(conn: sqlite3.Connection | None) -> dict[str, Any]:
         "cost": cost,
         "equity": equity,
         "unrealized": unrealized,
-        "realized": float(acc.get("realized_pnl") or 0),
+        "realized": realized,
         "fees_paid": float(acc.get("fees_paid") or 0),
         "total_pnl": total_pnl,
         "total_return": (total_pnl / starting) if starting else None,

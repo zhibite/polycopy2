@@ -107,6 +107,14 @@ def _short_title(value: Any, length: int = 58) -> str:
     return text if len(text) <= length else text[: length - 1] + "…"
 
 
+def _market_url(event_slug: Any) -> str | None:
+    slug = str(event_slug or "").strip()
+    if not slug:
+        return None
+    return "https://polymarket.com/event/" + urllib.parse.quote(
+        slug, safe="-_.~")
+
+
 REASON_CN = {
     "price_out_of_range": "价格不在区间",
     "target_too_small": "目标成交额过小",
@@ -148,6 +156,7 @@ templates.env.filters.update({
     "date_bj": _date_bj,
     "short_addr": _short_addr,
     "short_title": _short_title,
+    "market_url": _market_url,
     "reason_cn": _reason_cn,
 })
 
