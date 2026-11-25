@@ -259,7 +259,7 @@
         <input type="number" step="any" min="0" max="0.5" name="target.fee_rate"
                value="{{ target.fee_rate if target.fee_rate is not none else '' }}"
                placeholder="继承 paper.fee_rate">
-        <div class="help">留空继承全局；加密市场当前为 0.07，其他类别按官方费率设置。</div>
+        <div class="help">留空继承全局；按市场的 feeSchedule 设置，f705 月度/周度可留空。</div>
       </div>
       <div class="field">
         <label>排除事件关键词（逗号分隔）</label>
@@ -302,7 +302,7 @@
         <label>全局手续费率</label>
         <input type="number" step="any" min="0" max="0.5" name="paper.fee_rate"
                value="{{ cfg.paper.fee_rate }}">
-        <div class="help">手续费 = 份额 × 费率 × 价格 × (1 − 价格)；加密市场当前为 0.07。</div>
+        <div class="help">手续费 = 份额 × 费率 × 价格 × (1 − 价格)。f705 月度/周度市场用 0.01；BTC 5m/15m 通常为 0.05。</div>
       </div>
       <div class="field">
         <label>买入滑点上限（价格）</label>
