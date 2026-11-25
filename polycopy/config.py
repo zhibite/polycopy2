@@ -84,7 +84,7 @@ class LiveConfig:
     dry_run: bool = True            # true = compute/record orders, submit nothing
     private_key_env: str = "POLY_PRIVATE_KEY"
     funder: str = ""                # proxy/funder wallet that holds USDC / positions
-    signature_type: int = 2         # 0 EOA, 1 email/Magic proxy, 2 browser/Safe proxy
+    signature_type: int = 2         # 0 EOA, 1 email/Magic, 2 Safe proxy, 3 deposit wallet
     host: str = "https://clob.polymarket.com"
     chain_id: int = 137
     max_order_usd: float = 500.0
@@ -114,8 +114,8 @@ class LiveConfig:
         self.chain_id = int(self.chain_id)
         if self.chain_id <= 0:
             raise ValueError("live.chain_id must be positive")
-        if self.signature_type not in (0, 1, 2):
-            raise ValueError("live.signature_type must be 0, 1 or 2")
+        if self.signature_type not in (0, 1, 2, 3):
+            raise ValueError("live.signature_type must be 0, 1, 2 or 3")
         for name in ("max_order_usd", "max_total_exposure_usd",
                      "max_daily_loss_usd", "min_order_shares"):
             value = float(getattr(self, name))

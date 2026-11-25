@@ -534,7 +534,7 @@ async def config_save(request: Request):
         private_key_env=str(form.get("live.private_key_env") or "").strip(),
         funder=str(form.get("live.funder") or "").strip(),
         signature_type=_fint(form, "live.signature_type", cfg.live.signature_type,
-                             errors, "实盘签名类型", 0, 2),
+                             errors, "实盘签名类型", 0, 3),
         max_order_usd=_fnum(form, "live.max_order_usd", cfg.live.max_order_usd,
                             errors, "实盘单笔上限", 0.01, 1e9),
         max_total_exposure_usd=_fnum(

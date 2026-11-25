@@ -203,6 +203,10 @@ def _cmd_live_check(cfg: AppConfig, args: argparse.Namespace) -> int:
             gateway = SdkClobGateway.from_config(cfg.live, logger=logger)
             gateway.healthcheck()
             print("SDK/auth check    : OK")
+            try:
+                print(f"collateral balance: {gateway.balance()}")
+            except Exception as exc:  # noqa: BLE001
+                print(f"collateral balance: ERROR {exc}")
         except Exception as exc:  # noqa: BLE001
             print(f"SDK/auth check    : ERROR {exc}")
             return 1

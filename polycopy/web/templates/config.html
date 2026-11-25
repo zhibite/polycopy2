@@ -77,9 +77,10 @@
       <select name="live.signature_type">
         <option value="0" {{ 'selected' if live.signature_type == 0 else '' }}>0 · EOA / 私钥钱包</option>
         <option value="1" {{ 'selected' if live.signature_type == 1 else '' }}>1 · Email / Magic 代理</option>
-        <option value="2" {{ 'selected' if live.signature_type == 2 else '' }}>2 · 浏览器钱包 / Safe 代理</option>
+        <option value="2" {{ 'selected' if live.signature_type == 2 else '' }}>2 · 旧版浏览器钱包 / Safe 代理</option>
+        <option value="3" {{ 'selected' if live.signature_type == 3 else '' }}>3 · Deposit Wallet / POLY_1271（2026 新账户）</option>
       </select>
-      <div class="help">用 Polymarket 网页钱包时通常是 2；新建 EOA 热钱包是 0。</div>
+      <div class="help">OKX/MetaMask 等插件登录后，如果 Polymarket 显示的是“deposit address”，通常用 3，funder 填该 deposit 地址；旧版 Safe 代理用 2；新建 EOA 热钱包用 0。</div>
     </div>
     <div class="field">
       <label>实盘数据库路径</label>

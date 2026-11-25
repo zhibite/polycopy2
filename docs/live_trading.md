@@ -26,8 +26,10 @@ Polymarket 2026 年的 V2 协议使用 pUSD 抵押，订单/赎回由 SDK 处理
 export POLY_PRIVATE_KEY=0x...
 ```
 
-- 网页登录的 Polymarket 账户：`signature_type=2`；Email/Magic：1；
-  自己新建的 EOA 热钱包：0。
+- 网页登录的 Polymarket 账户：如果显示的是 **deposit address**（2026 年
+  OKX/MetaMask 等插件登录常见），通常是 `signature_type=3`（POLY_1271
+  deposit wallet），`funder` 填该 deposit 地址；旧版 Safe 代理用 2；
+  Email/Magic 用 1；自己新建的 EOA 热钱包用 0。
 - 首次使用先跑一笔 $1–2 的手工单，确认授权、tick size、neg-risk、费用和
   赎回都正常。
 
@@ -41,7 +43,7 @@ mode = "paper"          # paper | live
 dry_run = true          # true = 只记录订单意图，不提交
 private_key_env = "POLY_PRIVATE_KEY"
 funder = "0x..."
-signature_type = 2
+signature_type = 3        # deposit wallet；旧版 Safe 代理用 2
 max_order_usd = 500.0
 max_total_exposure_usd = 5000.0
 max_daily_loss_usd = 500.0

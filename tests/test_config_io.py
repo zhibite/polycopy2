@@ -94,6 +94,13 @@ class ConfigIOTest(unittest.TestCase):
             self.assertEqual(loaded.live.max_order_usd, 25.0)
             self.assertEqual(loaded.live.kill_switch_path, "data/TEST_HALT")
 
+    def test_live_signature_type_3_is_valid(self):
+        live = LiveConfig(signature_type=3)
+        live.validate()
+        self.assertEqual(live.signature_type, 3)
+        with self.assertRaises(ValueError):
+            LiveConfig(signature_type=4).validate()
+
     def test_missing_run_section_defaults_to_paper(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "config.toml"
