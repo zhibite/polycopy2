@@ -96,6 +96,10 @@ class Engine:
         except Exception:
             self.log.exception("orphan reconciliation failed")
         try:
+            self.process_manual_sells()
+        except Exception:
+            self.log.exception("manual sell processing failed")
+        try:
             self.retry_pending_exits()
         except Exception:
             self.log.exception("pending exit retry failed")
@@ -349,9 +353,23 @@ class Engine:
             self._skip(target, row, "no_position", source=source)
             return
 
-        our_shares = float(pos["shares"]) * frac
+        current = float(pos["shares"])
+        basis = float(pos.get("basis_shares") or 0.0) or current
+        credit = float(pos.get("manual_credit") or 0.0)
+        if frac >= 0.999:
+            # Target is exiting: never leave a manual-sell residual behind.
+            normal_sold = basis
+            credit_used = credit
+            our_shares = current
+        else:
+            normal_sold = basis * frac
+            credit_used = min(credit, normal_sold)
+            our_shares = min(current, normal_sold - credit_used)
         if our_shares <= 1e-12:
-            self._skip(target, row, "dust", source=source)
+            self.store.consume_manual_credit(
+                target.address, cond, token, normal_sold, credit_used,
+                ts=int(time.time()))
+            self._skip(target, row, "manual_credit_absorbed", source=source)
             return
         if our_shares < float(self.executor.min_shares):
             if self.executor.is_live or not strict:
@@ -402,7 +420,9 @@ class Engine:
         market_usd = self.store.market_exposure(cond)
         cash = float(self.store.account()["cash"])
         applied = None
+        sold_total = max(our_shares, 1e-12)
         for fill in result.fills:
+            ratio = min(1.0, fill.shares / sold_total)
             sell_result = self.store.apply_sell(
                 ts=int(time.time()), target=target.address, signal_id=None,
                 condition_id=cond, token_id=token,
@@ -410,6 +430,8 @@ class Engine:
                 price=fill.price, fee=fill.fee,
                 note="strict_exit" if strict else None,
                 order_id=fill.order_id,
+                basis_reduction=normal_sold * ratio,
+                credit_reduction=credit_used * ratio,
             )
             if sell_result is not None:
                 applied = sell_result
@@ -449,6 +471,128 @@ class Engine:
             shares=shares, reason=reason, ts=int(time.time()),
         )
         self.store.commit()
+
+    # ------------------------------------------------------------ manual sells
+    def process_manual_sells(self) -> int:
+        """Execute queued manual sells from the positions page.
+
+        Manual sells are prepayments against future target sells: they reduce
+        current shares but stay in ``basis_shares`` as ``manual_credit``.  The
+        copy-sell path consumes that credit first, and a target full exit
+        always sells whatever remains.
+        """
+        now = int(time.time())
+        filled_requests = 0
+        for req in self.store.pending_manual_sells():
+            if now - int(req.get("updated_at") or 0) < 10:
+                continue
+            request_id = int(req["id"])
+            target_addr = str(req["target"])
+            cond = str(req["condition_id"])
+            token = str(req["token_id"])
+            pos = self.store.position(target_addr, cond, token)
+            if not pos or pos.get("status") != "OPEN" or float(pos["shares"]) <= 1e-9:
+                self.store.update_manual_sell(
+                    request_id, status="DONE", reason="no_position", ts=now)
+                continue
+            remaining = min(float(req["remaining_shares"]),
+                            float(pos["shares"]))
+            if remaining <= 1e-9:
+                self.store.update_manual_sell(
+                    request_id, status="DONE", remaining_shares=0.0, ts=now)
+                continue
+            if (self.executor.is_live
+                    and remaining < float(self.executor.min_shares)):
+                self.store.update_manual_sell(
+                    request_id, status="FAILED", reason="below_min_size",
+                    ts=now)
+                continue
+
+            target_cfg = next(
+                (t for t in self.cfg.targets.values()
+                 if t.address.lower() == target_addr.lower()), None)
+            fee_rate = (self._fee_rate(target_cfg) if target_cfg
+                        else self.cfg.paper.fee_rate)
+            attempts = int(req.get("attempts") or 0) + 1
+            if attempts > 180:
+                self.store.update_manual_sell(
+                    request_id, status="FAILED", reason="max_attempts",
+                    attempts=attempts, ts=now)
+                continue
+            intent = TradeIntent(
+                dedupe_key=f"manual:{request_id}:{attempts}",
+                target=target_addr, condition_id=cond, token_id=token,
+                outcome=str(pos.get("outcome") or ""),
+                title=str(pos.get("title") or ""),
+                event_slug=str(pos.get("event_slug") or ""),
+                side="SELL", shares=remaining, limit_price=0.001,
+                signal_price=0.0, fee_rate=fee_rate, strict=True,
+                source="manual_sell",
+            )
+            result = self.executor.sell(intent)
+            if not result.fills:
+                if result.status == "dry_run":
+                    self.store.update_manual_sell(
+                        request_id, status="DRY_RUN", reason="dry_run",
+                        attempts=attempts, ts=now)
+                    continue
+                terminal = result.reason in (
+                    "below_min_size", "live_gateway_unavailable",
+                    "submit_error", "duplicate_order",
+                )
+                self.store.update_manual_sell(
+                    request_id,
+                    status="FAILED" if terminal else None,
+                    reason=result.reason or "no_fill",
+                    attempts=attempts, ts=now)
+                continue
+
+            filled = min(result.filled_shares, remaining)
+            applied = False
+            for fill in result.fills:
+                share = min(float(fill.shares), max(0.0, remaining))
+                if share <= 1e-12:
+                    continue
+                sell_result = self.store.apply_sell(
+                    ts=now, target=target_addr, signal_id=None,
+                    condition_id=cond, token_id=token,
+                    outcome=str(pos.get("outcome") or ""),
+                    shares=share, price=fill.price, fee=fill.fee,
+                    note="manual_sell", order_id=fill.order_id, manual=True,
+                    kind="MANUAL",
+                )
+                applied = applied or sell_result is not None
+            if not applied:
+                self.store.update_manual_sell(
+                    request_id, reason="no_position", attempts=attempts,
+                    ts=now)
+                continue
+            self.store.reduce_pending_exit(
+                target_addr, cond, token, filled)
+            new_remaining = max(0.0, float(req["remaining_shares"]) - filled)
+            old_filled = float(req.get("filled_shares") or 0.0)
+            old_avg = float(req.get("avg_price") or 0.0)
+            new_filled = old_filled + filled
+            new_avg = ((old_avg * old_filled + result.notional) / new_filled
+                       if new_filled else 0.0)
+            status = "DONE" if new_remaining <= 1e-9 else "PARTIAL"
+            self.store.update_manual_sell(
+                request_id, status=status, remaining_shares=new_remaining,
+                filled_shares=new_filled, avg_price=new_avg,
+                fee=float(req.get("fee") or 0.0) + result.fee,
+                attempts=attempts, ts=now)
+            filled_requests += 1
+            self.log.warning(
+                "MANUAL SELL %-8s px=%.4f sh=%.4f $=%.2f fee=%.4f "
+                "remaining=%.4f mode=%s",
+                target_addr[:10],
+                (result.notional / result.filled_shares
+                 if result.filled_shares else 0.0),
+                filled, result.notional, result.fee, new_remaining,
+                "live" if self.executor.is_live else "paper",
+            )
+        self.store.commit()
+        return filled_requests
 
     # ------------------------------------------------------------ strict exits
     def retry_pending_exits(self) -> int:

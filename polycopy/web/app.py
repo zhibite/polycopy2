@@ -122,6 +122,7 @@ REASON_CN = {
     "no_liquidity": "无流动性",
     "insufficient_depth": "深度不足",
     "below_min_size": "低于最小下单量",
+    "manual_credit_absorbed": "手动卖出已覆盖本次目标卖出",
     "sells_disabled": "未开启跟卖",
     "target_no_position": "目标无仓位",
     "no_position": "我方无仓位",
@@ -217,6 +218,9 @@ def _render(request: Request, name: str, page: str, **ctx: Any) -> HTMLResponse:
         "live_dry_run": dry_run,
         "config_mode": configured_mode,
         "mode_mismatch": bool(db_mode and db_mode != configured_mode),
+        "min_sell_shares": (
+            cfg.live.min_order_shares if actual_mode == "live"
+            else cfg.paper.min_shares) if cfg else 1.0,
     }
     context.update(ctx)
     return templates.TemplateResponse(request=request, name=name, context=context)
@@ -334,8 +338,8 @@ def dashboard(request: Request):
 
 
 @app.get("/trades", response_class=HTMLResponse)
-def trades(request: Request, side: str = "", target: str = "",
-           start: str = "", end: str = "", page: int = 1):
+def trades(request: Request, side: str = "", fill_type: str = "",
+           target: str = "", start: str = "", end: str = "", page: int = 1):
     redirect = _login_redirect(request)
     if redirect:
         return redirect
@@ -343,7 +347,7 @@ def trades(request: Request, side: str = "", target: str = "",
     conn = queries.connect()
     try:
         data = queries.fills_page(
-            conn, side=side, target=target,
+            conn, side=side, fill_type=fill_type, target=target,
             start_ts=_parse_date(start), end_ts=_parse_date(end, end_of_day=True),
             page=page, per_page=50,
         )
@@ -351,25 +355,54 @@ def trades(request: Request, side: str = "", target: str = "",
         queries.close(conn)
     return _render(
         request, "trades.html", "trades", data=data, cfg=_load_cfg(),
-        filters={"side": side, "target": target, "start": start, "end": end},
+        filters={"side": side, "fill_type": fill_type, "target": target,
+                 "start": start, "end": end},
     )
 
 
 @app.get("/positions", response_class=HTMLResponse)
-def positions(request: Request, status: str = "open", page: int = 1):
+def positions(request: Request, status: str = "open", page: int = 1,
+              sell_queued: str = "", sell_error: str = ""):
     redirect = _login_redirect(request)
     if redirect:
         return redirect
+    session = auth.current_session(request)
     conn = queries.connect()
     try:
         data = queries.positions_page(conn, status=status, page=page, per_page=50)
         settlements = queries.recent_settlements(conn, limit=15)
+        queued_manual = queries.pending_manual_sells(conn, limit=20)
     finally:
         queries.close(conn)
     return _render(
         request, "positions.html", "positions", data=data,
         settlements=settlements, cfg=_load_cfg(),
+        csrf=session.csrf if session else "",
+        queued_manual=queued_manual,
+        sell_queued=bool(sell_queued), sell_error=sell_error,
     )
+
+
+@app.post("/positions/sell")
+def positions_sell(request: Request, position_id: int = Form(...),
+                   pct: float = Form(...), csrf: str = Form("")):
+    session = auth.current_session(request)
+    if session is None:
+        return RedirectResponse("/login?next=/positions", status_code=302)
+    if not secrets.compare_digest(str(csrf or ""), session.csrf):
+        raise HTTPException(status_code=400, detail="CSRF 校验失败，请刷新页面重试")
+    if pct not in (0.25, 0.5, 1.0):
+        return RedirectResponse(
+            "/positions?sell_error=" + urllib.parse.quote("卖出比例无效"),
+            status_code=303,
+        )
+    request_id, error = queries.queue_manual_sell(position_id, pct)
+    if error:
+        return RedirectResponse(
+            "/positions?sell_error=" + urllib.parse.quote(str(error)),
+            status_code=303,
+        )
+    return RedirectResponse("/positions?sell_queued=1", status_code=303)
 
 
 @app.get("/signals", response_class=HTMLResponse)
@@ -380,7 +413,7 @@ def signals(request: Request, copied: str = "", reason: str = "", page: int = 1)
     conn = queries.connect()
     try:
         data = queries.signals_page(
-            conn, copied=copied, reason=reason, page=page, per_page=100
+            conn, copied=copied, reason=reason, page=page, per_page=20
         )
         summary = queries.signal_summary(conn)
     finally:
@@ -633,14 +666,14 @@ def api_status(request: Request):
 
 
 @app.get("/api/fills")
-def api_fills(request: Request, side: str = "", target: str = "",
-              start: str = "", end: str = "", page: int = 1):
+def api_fills(request: Request, side: str = "", fill_type: str = "",
+              target: str = "", start: str = "", end: str = "", page: int = 1):
     _require_api(request)
     conn = queries.connect()
     try:
         return queries.fills_page(
             conn, side=side.upper() if side.upper() in ("BUY", "SELL") else "",
-            target=target, start_ts=_parse_date(start),
+            fill_type=fill_type, target=target, start_ts=_parse_date(start),
             end_ts=_parse_date(end, end_of_day=True), page=page, per_page=100,
         )
     finally:

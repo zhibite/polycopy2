@@ -83,6 +83,8 @@ CREATE TABLE IF NOT EXISTS positions (
     title TEXT,
     event_slug TEXT,
     shares REAL NOT NULL DEFAULT 0,
+    basis_shares REAL NOT NULL DEFAULT 0,
+    manual_credit REAL NOT NULL DEFAULT 0,
     avg_cost REAL NOT NULL DEFAULT 0,
     realized_pnl REAL NOT NULL DEFAULT 0,
     opened_at INTEGER,
@@ -173,6 +175,25 @@ CREATE TABLE IF NOT EXISTS pending_exits (
 );
 CREATE INDEX IF NOT EXISTS idx_pending_exits_target ON pending_exits(target);
 
+CREATE TABLE IF NOT EXISTS manual_sells (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target TEXT NOT NULL,
+    condition_id TEXT NOT NULL DEFAULT '',
+    token_id TEXT NOT NULL,
+    pct REAL NOT NULL,
+    shares_requested REAL NOT NULL,
+    remaining_shares REAL NOT NULL,
+    filled_shares REAL NOT NULL DEFAULT 0,
+    avg_price REAL NOT NULL DEFAULT 0,
+    fee REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    reason TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_manual_sells_status ON manual_sells(status);
+
 CREATE TABLE IF NOT EXISTS kv (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -203,6 +224,24 @@ class Store:
             )
         if "order_id" not in cols:
             self.conn.execute("ALTER TABLE fills ADD COLUMN order_id INTEGER")
+        pos_cols = {
+            row[1] for row in self.conn.execute("PRAGMA table_info(positions)")
+        }
+        added_basis = False
+        if "basis_shares" not in pos_cols:
+            self.conn.execute(
+                "ALTER TABLE positions ADD COLUMN basis_shares REAL NOT NULL"
+                " DEFAULT 0")
+            added_basis = True
+        if "manual_credit" not in pos_cols:
+            self.conn.execute(
+                "ALTER TABLE positions ADD COLUMN manual_credit REAL NOT NULL"
+                " DEFAULT 0")
+        if added_basis:
+            # Existing positions predate manual-sell accounting.
+            self.conn.execute(
+                "UPDATE positions SET basis_shares = shares"
+                " WHERE basis_shares = 0 AND shares > 0")
         order_cols = {
             row[1] for row in self.conn.execute("PRAGMA table_info(orders)")
         }
@@ -424,6 +463,101 @@ class Store:
             (target, condition_id, token_id),
         )
 
+    def consume_manual_credit(self, target: str, condition_id: str,
+                              token_id: str, basis_reduction: float,
+                              credit_reduction: float,
+                              ts: int | None = None) -> None:
+        """Advance basis/credit for a target sell fully covered by manual sales.
+
+        No shares change hands, but the target-equivalent position and the
+        manual credit must both shrink so later fractions stay correct.
+        """
+        row = self.conn.execute(
+            "SELECT * FROM positions WHERE target = ? AND condition_id = ?"
+            " AND token_id = ? AND status = 'OPEN'",
+            (target, condition_id, token_id),
+        ).fetchone()
+        if row is None:
+            return
+        basis = float(row["basis_shares"] or 0.0) or float(row["shares"])
+        credit = float(row["manual_credit"] or 0.0)
+        self.conn.execute(
+            "UPDATE positions SET basis_shares = ?, manual_credit = ?,"
+            " updated_at = ? WHERE id = ?",
+            (max(0.0, basis - max(0.0, basis_reduction)),
+             max(0.0, credit - max(0.0, credit_reduction)),
+             int(ts or time.time()), row["id"]),
+        )
+
+    def reduce_pending_exit(self, target: str, condition_id: str,
+                            token_id: str, shares: float) -> None:
+        """A manual sell takes precedence over a queued target exit."""
+        if shares <= 1e-12:
+            return
+        row = self.pending_exit(target, condition_id, token_id)
+        if not row:
+            return
+        remaining = max(0.0, float(row["shares"]) - float(shares))
+        if remaining <= 1e-9:
+            self.delete_pending_exit(row["id"])
+        else:
+            self.conn.execute(
+                "UPDATE pending_exits SET shares = ?, updated_at = ? WHERE id = ?",
+                (remaining, int(time.time()), row["id"]),
+            )
+
+    # ---------------------------------------------------------- manual sells
+    def queue_manual_sell(self, *, target: str, condition_id: str,
+                          token_id: str, pct: float, shares_requested: float,
+                          ts: int | None = None) -> int:
+        now = int(ts or time.time())
+        cur = self.conn.execute(
+            "INSERT INTO manual_sells(target, condition_id, token_id, pct,"
+            " shares_requested, remaining_shares, status, attempts,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?, 'PENDING', 0, ?, 0)",
+            (target, condition_id, token_id, float(pct),
+             float(shares_requested), float(shares_requested), now),
+        )
+        return int(cur.lastrowid or 0)
+
+    def manual_sell(self, request_id: int) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM manual_sells WHERE id = ?", (int(request_id),)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def pending_manual_sells(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM manual_sells WHERE status IN ('PENDING', 'PARTIAL')"
+            " ORDER BY id").fetchall()
+        return [dict(r) for r in rows]
+
+    def update_manual_sell(self, request_id: int, *,
+                           status: str | None = None,
+                           remaining_shares: float | None = None,
+                           filled_shares: float | None = None,
+                           avg_price: float | None = None,
+                           fee: float | None = None,
+                           attempts: int | None = None,
+                           reason: str | None = None,
+                           ts: int | None = None) -> None:
+        updates: list[str] = ["updated_at = ?"]
+        params: list[Any] = [int(ts or time.time())]
+        mapping = {
+            "status": status, "remaining_shares": remaining_shares,
+            "filled_shares": filled_shares, "avg_price": avg_price,
+            "fee": fee, "attempts": attempts, "reason": reason,
+        }
+        for column, value in mapping.items():
+            if value is not None:
+                updates.append(f"{column} = ?")
+                params.append(value)
+        params.append(int(request_id))
+        self.conn.execute(
+            "UPDATE manual_sells SET " + ", ".join(updates) + " WHERE id = ?",
+            params,
+        )
+
     # --------------------------------------------------------------- orders
     def create_order(self, *, dedupe_key: str, target: str, mode: str,
                      side: str, condition_id: str, token_id: str,
@@ -624,28 +758,32 @@ class Store:
         ).fetchone()
         if row and row["status"] == "OPEN":
             old_shares = float(row["shares"])
+            old_basis = float(row["basis_shares"] or 0.0) or old_shares
             new_shares = old_shares + shares
+            new_basis = old_basis + shares
             new_avg = (float(row["avg_cost"]) * old_shares + total_cost) / new_shares
             self.conn.execute(
-                "UPDATE positions SET shares = ?, avg_cost = ?, updated_at = ?"
-                " WHERE id = ?",
-                (new_shares, new_avg, ts, row["id"]),
+                "UPDATE positions SET shares = ?, basis_shares = ?,"
+                " avg_cost = ?, updated_at = ? WHERE id = ?",
+                (new_shares, new_basis, new_avg, ts, row["id"]),
             )
         elif row:
             self.conn.execute(
-                "UPDATE positions SET status = 'OPEN', shares = ?, avg_cost = ?,"
+                "UPDATE positions SET status = 'OPEN', shares = ?,"
+                " basis_shares = ?, manual_credit = 0, avg_cost = ?,"
                 " outcome = ?, title = ?, event_slug = ?, opened_at = ?,"
                 " updated_at = ? WHERE id = ?",
-                (shares, total_cost / shares, outcome, title, event_slug, ts, ts,
-                 row["id"]),
+                (shares, shares, total_cost / shares, outcome, title, event_slug,
+                 ts, ts, row["id"]),
             )
         else:
             self.conn.execute(
                 "INSERT INTO positions(target, condition_id, token_id, outcome,"
-                " title, event_slug, shares, avg_cost, realized_pnl, opened_at,"
-                " updated_at, status) VALUES (?,?,?,?,?,?,?,?,0,?,?,'OPEN')",
+                " title, event_slug, shares, basis_shares, manual_credit,"
+                " avg_cost, realized_pnl, opened_at, updated_at, status)"
+                " VALUES (?,?,?,?,?,?,?,?,0,?,0,?,?,'OPEN')",
                 (target, condition_id, token_id, outcome, title, event_slug,
-                 shares, total_cost / shares, ts, ts),
+                 shares, shares, total_cost / shares, ts, ts),
             )
         self.conn.execute(
             "INSERT INTO fills(ts, target, signal_id, order_id, condition_id,"
@@ -659,7 +797,11 @@ class Store:
                    condition_id: str, token_id: str, outcome: str,
                    shares: float, price: float, fee: float,
                    note: str | None = None,
-                   order_id: int | None = None) -> dict[str, float] | None:
+                   order_id: int | None = None,
+                   basis_reduction: float | None = None,
+                   credit_reduction: float = 0.0,
+                   manual: bool = False,
+                   kind: str = "COPY") -> dict[str, float] | None:
         row = self.conn.execute(
             "SELECT * FROM positions WHERE target = ? AND condition_id = ?"
             " AND token_id = ? AND status = 'OPEN'",
@@ -678,10 +820,29 @@ class Store:
         realized = proceeds - sell_shares * float(row["avg_cost"])
         remaining = held - sell_shares
         status = "CLOSED" if remaining <= 1e-9 else "OPEN"
+        basis = float(row["basis_shares"] or 0.0) or held
+        credit = float(row["manual_credit"] or 0.0)
+        if manual:
+            # A manual sale is a prepayment against future target sells: it
+            # reduces current shares but stays in the copy basis.
+            new_basis = basis
+            new_credit = credit + sell_shares
+            if kind == "COPY":
+                kind = "MANUAL"
+        else:
+            reduction = (sell_shares if basis_reduction is None
+                         else max(0.0, basis_reduction))
+            new_basis = max(0.0, basis - reduction)
+            new_credit = max(0.0, credit - max(0.0, credit_reduction))
+        if status == "CLOSED":
+            new_basis = 0.0
+            new_credit = 0.0
         self.conn.execute(
-            "UPDATE positions SET shares = ?, realized_pnl = realized_pnl + ?,"
+            "UPDATE positions SET shares = ?, basis_shares = ?,"
+            " manual_credit = ?, realized_pnl = realized_pnl + ?,"
             " status = ?, updated_at = ? WHERE id = ?",
-            (max(0.0, remaining), realized, status, ts, row["id"]),
+            (max(0.0, remaining), new_basis, new_credit, realized, status, ts,
+             row["id"]),
         )
         self.conn.execute(
             "UPDATE account SET cash = cash + ?, realized_pnl = realized_pnl + ?,"
@@ -692,9 +853,9 @@ class Store:
             "INSERT INTO fills(ts, target, signal_id, order_id, condition_id,"
             " token_id, outcome, side, shares, price, notional, fee,"
             " realized_pnl, kind, note)"
-            " VALUES (?,?,?,?,?,?,?,'SELL',?,?,?,?,?,'COPY',?)",
+            " VALUES (?,?,?,?,?,?,?,'SELL',?,?,?,?,?,?,?)",
             (ts, target, signal_id, order_id, condition_id, token_id, outcome,
-             sell_shares, price, notional, fee, realized, note),
+             sell_shares, price, notional, fee, realized, kind, note),
         )
         if status == "CLOSED":
             self.clear_pending_exits(target, condition_id, token_id)
@@ -710,7 +871,8 @@ class Store:
         payout = shares * payout_per_share
         realized = payout - shares * avg_cost
         self.conn.execute(
-            "UPDATE positions SET shares = 0, status = 'CLOSED',"
+            "UPDATE positions SET shares = 0, basis_shares = 0,"
+            " manual_credit = 0, status = 'CLOSED',"
             " realized_pnl = realized_pnl + ?, updated_at = ? WHERE id = ?",
             (realized, ts, pos["id"]),
         )

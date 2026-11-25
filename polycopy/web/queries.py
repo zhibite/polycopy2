@@ -33,6 +33,24 @@ def connect() -> sqlite3.Connection | None:
         return None
 
 
+def connect_write() -> sqlite3.Connection | None:
+    """Short-lived write connection for queuing manual sell requests.
+
+    The dashboard never executes trades; it only inserts a request that the
+    bot's maintenance loop picks up.  WAL + busy_timeout lets this coexist
+    with the bot's connection.
+    """
+    if not DB_PATH.exists():
+        return None
+    try:
+        conn = sqlite3.connect(str(DB_PATH), timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=30000")
+        return conn
+    except sqlite3.Error:
+        return None
+
+
 def close(conn: sqlite3.Connection | None) -> None:
     if conn is not None:
         try:
@@ -102,6 +120,72 @@ def open_positions(conn: sqlite3.Connection | None,
         " FROM positions p LEFT JOIN marks m ON m.token_id = p.token_id"
         " WHERE p.status = 'OPEN'"
         " ORDER BY p.shares * p.avg_cost DESC LIMIT ?",
+        (limit,),
+    )
+
+
+def position(conn: sqlite3.Connection | None,
+             position_id: int) -> dict[str, Any] | None:
+    return _one(
+        conn,
+        "SELECT * FROM positions WHERE id = ?",
+        (int(position_id),),
+    )
+
+
+def queue_manual_sell(position_id: int, pct: float) -> tuple[int | None, str | None]:
+    """Insert a manual sell request for the bot to execute.
+
+    Returns ``(request_id, error)``.  The request snapshots the current shares
+    so a concurrent target sell cannot make it sell more than intended; the
+    bot caps it again at execution time.
+    """
+    conn = connect_write()
+    if conn is None:
+        return None, "数据库不可用"
+    try:
+        row = conn.execute(
+            "SELECT * FROM positions WHERE id = ? AND status = 'OPEN'",
+            (int(position_id),),
+        ).fetchone()
+        if row is None:
+            return None, "仓位不存在或已平仓"
+        shares = float(row["shares"] or 0.0)
+        if shares <= 1e-9:
+            return None, "仓位数量为 0"
+        requested = shares if pct >= 1.0 else shares * pct
+        if requested <= 1e-9:
+            return None, "卖出数量过小"
+        now = int(time.time())
+        cur = conn.execute(
+            "INSERT INTO manual_sells(target, condition_id, token_id, pct,"
+            " shares_requested, remaining_shares, status, attempts,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?, 'PENDING', 0, ?, 0)",
+            (str(row["target"]), str(row["condition_id"]),
+             str(row["token_id"]), float(pct), requested, requested, now),
+        )
+        conn.commit()
+        return int(cur.lastrowid or 0), None
+    except sqlite3.Error as exc:
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+        return None, str(exc)
+    finally:
+        close(conn)
+
+
+def pending_manual_sells(conn: sqlite3.Connection | None,
+                         limit: int = 20) -> list[dict[str, Any]]:
+    return _all(
+        conn,
+        "SELECT m.*, p.title AS title, p.outcome AS outcome"
+        " FROM manual_sells m LEFT JOIN positions p"
+        " ON p.target = m.target AND p.condition_id = m.condition_id"
+        " AND p.token_id = m.token_id"
+        " WHERE m.status IN ('PENDING', 'PARTIAL')"
+        " ORDER BY m.id DESC LIMIT ?",
         (limit,),
     )
 
@@ -239,7 +323,8 @@ def _page_bounds(page: int, per_page: int) -> tuple[int, int]:
 
 
 def fills_page(conn: sqlite3.Connection | None, *, side: str = "",
-               target: str = "", start_ts: int | None = None,
+               fill_type: str = "", target: str = "",
+               start_ts: int | None = None,
                end_ts: int | None = None, page: int = 1,
                per_page: int = PAGE_DEFAULT) -> dict[str, Any]:
     where: list[str] = []
@@ -247,6 +332,12 @@ def fills_page(conn: sqlite3.Connection | None, *, side: str = "",
     if side in ("BUY", "SELL"):
         where.append("f.side = ?")
         params.append(side)
+    if fill_type == "manual_sell":
+        where.append("f.kind = 'MANUAL'")
+    elif fill_type == "copy_buy":
+        where.append("f.kind != 'MANUAL' AND f.side = 'BUY'")
+    elif fill_type == "copy_sell":
+        where.append("f.kind != 'MANUAL' AND f.side = 'SELL'")
     if target:
         where.append("f.target = ?")
         params.append(target)

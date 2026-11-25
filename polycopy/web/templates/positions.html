@@ -19,6 +19,13 @@
   <a href="/positions?status=all" class="{{ 'active' if status == 'all' else '' }}">全部</a>
 </div>
 
+{% if sell_queued %}
+  <div class="alert ok">卖出请求已提交，bot 会在下一次维护循环按当前盘口执行；进度见下方手动卖出队列。</div>
+{% endif %}
+{% if sell_error %}
+  <div class="alert warn">卖出请求失败：{{ sell_error }}</div>
+{% endif %}
+
 <div class="stats-row">
   <div class="stat-card">
     <div class="stat-label">仓位数</div>
@@ -50,13 +57,15 @@
     <table>
       <thead>
         <tr>
-          <th>状态</th><th>市场</th><th>结果</th><th>数量</th><th>均价</th>
-          <th>标记价</th><th>浮动盈亏</th><th>已实现</th><th>更新时间</th>
+          <th>状态</th><th>市场</th><th>结果</th><th>数量</th><th>买入花费</th>
+          <th>均价</th><th>标记价</th><th>浮动盈亏</th><th>已实现</th>
+          <th>更新时间</th><th>操作</th>
         </tr>
       </thead>
       <tbody>
         {% for p in data.rows %}
           {% set mark = p.mark_mid if p.mark_mid is not none else p.avg_cost %}
+          {% set sell_ref = p.mark_bid if p.mark_bid is not none else mark %}
           {% set upnl = p.shares * (mark - p.avg_cost) if p.status == 'OPEN' else 0 %}
           <tr>
             <td>
@@ -67,6 +76,7 @@
             <td title="{{ p.title }}">{{ p.title|short_title(60) }}</td>
             <td>{{ p.outcome or '--' }}</td>
             <td class="mono">{{ p.shares|num(2) }}</td>
+            <td class="mono">{{ (p.shares * p.avg_cost)|money }}</td>
             <td class="mono">{{ p.avg_cost|price }}</td>
             <td class="mono">{{ (mark|price) if p.status == 'OPEN' else '--' }}</td>
             <td class="mono {{ 'green' if upnl >= 0 else 'red' }}">
@@ -76,9 +86,25 @@
               {{ p.realized_pnl|signed_money }}
             </td>
             <td class="mono muted">{{ p.updated_at|dt_bj }}</td>
+            <td>
+              {% if p.status == 'OPEN' %}
+                {% if p.shares < min_sell_shares %}
+                  <button class="btn btn-sm btn-ghost" disabled
+                          title="低于最小卖出份额 {{ min_sell_shares }}">卖出</button>
+                {% else %}
+                  <button class="btn btn-sm btn-ghost manual-sell-btn"
+                          data-position-id="{{ p.id }}"
+                          data-shares="{{ p.shares }}"
+                          data-mark="{{ sell_ref }}"
+                          data-title="{{ p.title|e }}">卖出</button>
+                {% endif %}
+              {% else %}
+                <span class="muted">--</span>
+              {% endif %}
+            </td>
           </tr>
         {% else %}
-          <tr><td colspan="9" class="no-data">暂无仓位</td></tr>
+          <tr><td colspan="11" class="no-data">暂无仓位</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -98,6 +124,35 @@
     {% endif %}
   </div>
 </div>
+
+{% if queued_manual %}
+<div class="section">
+  <h2>手动卖出队列 <span class="count">{{ queued_manual|length }}</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>时间</th><th>市场</th><th>比例</th><th>请求份额</th><th>已成交</th><th>状态</th></tr>
+      </thead>
+      <tbody>
+        {% for m in queued_manual %}
+          <tr>
+            <td class="mono">{{ m.created_at|dt_bj }}</td>
+            <td title="{{ m.title }}">{{ (m.title or m.token_id)|short_title(58) }}</td>
+            <td class="mono">{{ (m.pct * 100)|num(0) }}%</td>
+            <td class="mono">{{ m.shares_requested|num(2) }}</td>
+            <td class="mono">{{ m.filled_shares|num(2) }}</td>
+            <td>
+              <span class="pill {{ 'warn' if m.status == 'PARTIAL' else 'idle' }}">
+                {{ m.status }}{% if m.reason %} · {{ m.reason }}{% endif %}
+              </span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <div class="section">
   <h2>最近结算 <span class="count">{{ settlements|length }}</span></h2>
@@ -123,5 +178,86 @@
     </table>
   </div>
 </div>
+
+<div id="sell-modal" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sell-modal-title">
+    <h3 id="sell-modal-title">手动卖出</h3>
+    <div class="modal-sub" id="sell-market"></div>
+    <div class="modal-meta">
+      持仓 <b id="sell-shares">--</b> 份 ·
+      参考买一价 <b id="sell-mark">--</b>
+    </div>
+    <form method="post" action="/positions/sell" id="sell-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="position_id" id="sell-position-id">
+      <input type="hidden" name="pct" id="sell-pct">
+      <div class="sell-options">
+        <button type="button" class="btn btn-ghost sell-pct" data-pct="0.25">卖出 25%</button>
+        <button type="button" class="btn btn-ghost sell-pct" data-pct="0.5">卖出 50%</button>
+        <button type="button" class="btn btn-ghost sell-pct" data-pct="1">卖出 100%</button>
+      </div>
+      <div class="modal-note" id="sell-note">
+        确认后按当前盘口市价卖出；实际成交价可能低于标记价，薄盘口可能分多次成交。
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="sell-cancel">取消</button>
+        <button type="submit" class="btn btn-primary" id="sell-submit" disabled>确认卖出</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById('sell-modal');
+  if (!modal) return;
+  var positionInput = document.getElementById('sell-position-id');
+  var pctInput = document.getElementById('sell-pct');
+  var sharesEl = document.getElementById('sell-shares');
+  var marketEl = document.getElementById('sell-market');
+  var markEl = document.getElementById('sell-mark');
+  var noteEl = document.getElementById('sell-note');
+  var submitEl = document.getElementById('sell-submit');
+  var selectedShares = 0;
+
+  function openModal(btn) {
+    var shares = parseFloat(btn.dataset.shares || '0');
+    selectedShares = shares;
+    positionInput.value = btn.dataset.positionId || '';
+    pctInput.value = '';
+    sharesEl.textContent = shares.toFixed(2);
+    marketEl.textContent = btn.dataset.title || '';
+    markEl.textContent = (parseFloat(btn.dataset.mark || '0')).toFixed(3);
+    noteEl.textContent = '确认后按当前盘口市价卖出；实际成交价可能低于标记价，薄盘口可能分多次成交。';
+    submitEl.disabled = true;
+    modal.hidden = false;
+  }
+
+  function closeModal() { modal.hidden = true; }
+
+  document.querySelectorAll('.manual-sell-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { openModal(btn); });
+  });
+
+  document.querySelectorAll('.sell-pct').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pct = parseFloat(btn.dataset.pct || '0');
+      pctInput.value = String(pct);
+      var shares = pct >= 1 ? selectedShares : selectedShares * pct;
+      noteEl.textContent = '将卖出约 ' + shares.toFixed(2) + ' 份（' +
+        (pct * 100).toFixed(0) + '%），按当前盘口市价成交。';
+      submitEl.disabled = false;
+    });
+  });
+
+  document.getElementById('sell-cancel').addEventListener('click', closeModal);
+  modal.addEventListener('click', function (event) {
+    if (event.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && !modal.hidden) closeModal();
+  });
+})();
+</script>
 
 {% endblock %}

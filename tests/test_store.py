@@ -122,6 +122,49 @@ class StoreTest(unittest.TestCase):
         self.assertAlmostEqual(order["filled_size"], 10.0)
         self.assertAlmostEqual(order["fee_rate"], 0.01)
 
+    def test_manual_sell_credit_survives_and_offsets_copy_sell(self):
+        self.store.apply_buy(
+            ts=1, target="t", signal_id=None, condition_id="c",
+            token_id="k", outcome="Yes", title="m", event_slug="e",
+            shares=10, price=0.5, fee=0.0,
+        )
+        pos = self.store.position("t", "c", "k")
+        self.assertAlmostEqual(pos["basis_shares"], 10.0)
+        self.assertAlmostEqual(pos["manual_credit"], 0.0)
+
+        # Manual 20%: current shrinks, basis stays.
+        self.store.apply_sell(
+            ts=2, target="t", signal_id=None, condition_id="c",
+            token_id="k", outcome="Yes", shares=2, price=0.5, fee=0.0,
+            manual=True,
+        )
+        pos = self.store.position("t", "c", "k")
+        self.assertAlmostEqual(pos["shares"], 8.0)
+        self.assertAlmostEqual(pos["basis_shares"], 10.0)
+        self.assertAlmostEqual(pos["manual_credit"], 2.0)
+        self.assertEqual(self.store.recent_fills(1)[0]["kind"], "MANUAL")
+
+        # Target sells 50%: equivalent 5 shares, 2 covered by manual credit.
+        self.store.apply_sell(
+            ts=3, target="t", signal_id=None, condition_id="c",
+            token_id="k", outcome="Yes", shares=3, price=0.5, fee=0.0,
+            basis_reduction=5, credit_reduction=2,
+        )
+        pos = self.store.position("t", "c", "k")
+        self.assertAlmostEqual(pos["shares"], 5.0)
+        self.assertAlmostEqual(pos["basis_shares"], 5.0)
+        self.assertAlmostEqual(pos["manual_credit"], 0.0)
+
+        self.store.apply_sell(
+            ts=4, target="t", signal_id=None, condition_id="c",
+            token_id="k", outcome="Yes", shares=5, price=0.5, fee=0.0,
+            basis_reduction=5,
+        )
+        pos = self.store.position("t", "c", "k")
+        self.assertEqual(pos["status"], "CLOSED")
+        self.assertAlmostEqual(pos["basis_shares"], 0.0)
+        self.assertAlmostEqual(pos["manual_credit"], 0.0)
+
     def test_fill_order_link_and_realized_pnl_since(self):
         self.store.apply_buy(
             ts=10, target="t", signal_id=None, condition_id="c",

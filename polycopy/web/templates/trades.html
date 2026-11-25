@@ -5,7 +5,7 @@
 <div class="page-head">
   <div>
     <h1>交易记录</h1>
-    <div class="page-sub">纸盘跟单的实际成交记录 · 时间为北京时间</div>
+    <div class="page-sub">跟单买卖与手动卖出的实际成交记录 · 时间为北京时间</div>
   </div>
   <div class="head-meta">
     共 <b>{{ data.total }}</b> 笔成交<br>
@@ -14,11 +14,12 @@
 </div>
 
 <form class="filters" method="get" action="/trades">
-  <label>方向
-    <select name="side">
-      <option value="" {{ 'selected' if filters.side == '' else '' }}>全部</option>
-      <option value="BUY" {{ 'selected' if filters.side == 'BUY' else '' }}>买入</option>
-      <option value="SELL" {{ 'selected' if filters.side == 'SELL' else '' }}>卖出</option>
+  <label>类型
+    <select name="fill_type">
+      <option value="" {{ 'selected' if filters.fill_type == '' else '' }}>全部</option>
+      <option value="copy_buy" {{ 'selected' if filters.fill_type == 'copy_buy' else '' }}>跟单买入</option>
+      <option value="copy_sell" {{ 'selected' if filters.fill_type == 'copy_sell' else '' }}>跟单卖出</option>
+      <option value="manual_sell" {{ 'selected' if filters.fill_type == 'manual_sell' else '' }}>手动卖出</option>
     </select>
   </label>
   <label>目标钱包
@@ -70,7 +71,7 @@
     <table>
       <thead>
         <tr>
-          <th>时间</th><th>方向</th><th>市场</th><th>结果</th>
+          <th>时间</th><th>类型</th><th>市场</th><th>结果</th>
           <th>价格</th><th>数量</th><th>金额</th><th>手续费</th><th>已实现盈亏</th>
         </tr>
       </thead>
@@ -78,7 +79,15 @@
         {% for f in data.rows %}
           <tr>
             <td class="mono">{{ f.ts|dt_bj }}</td>
-            <td><span class="pill {{ 'buy' if f.side == 'BUY' else 'sell' }}">{{ '买入' if f.side == 'BUY' else '卖出' }}</span></td>
+            <td>
+              {% if f.kind == 'MANUAL' %}
+                <span class="pill warn">手动卖出</span>
+              {% elif f.side == 'BUY' %}
+                <span class="pill buy">跟单买入</span>
+              {% else %}
+                <span class="pill sell">跟单卖出{% if f.note == 'strict_exit' %} · 强平{% elif f.note == 'reconciled' %} · 对账{% endif %}</span>
+              {% endif %}
+            </td>
             <td title="{{ f.title }}">{{ (f.title or f.condition_id)|short_title(58) }}</td>
             <td>{{ f.outcome or '--' }}</td>
             <td class="mono">{{ f.price|price }}</td>
@@ -97,7 +106,7 @@
   </div>
 
   {% set pages = (((data.total - 1) // data.per_page) + 1) if data.total > 0 else 1 %}
-  {% set qs = 'side=' ~ filters.side ~ '&target=' ~ filters.target ~ '&start=' ~ filters.start ~ '&end=' ~ filters.end %}
+  {% set qs = 'side=' ~ filters.side ~ '&fill_type=' ~ filters.fill_type ~ '&target=' ~ filters.target ~ '&start=' ~ filters.start ~ '&end=' ~ filters.end %}
   <div class="pager">
     {% if data.page > 1 %}
       <a href="/trades?{{ qs }}&page={{ data.page - 1 }}">上一页</a>

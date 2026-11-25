@@ -264,6 +264,74 @@ class EngineTest(unittest.TestCase):
             store.position("0xabc", "c1", "t1")["status"], "CLOSED")
         self.assertIsNone(store.pending_exit("0xabc", "c1", "t1"))
 
+    def test_manual_sell_offsets_future_target_sells_and_fully_exits(self):
+        now = int(time.time())
+        engine, store = self.make_engine(
+            [trade_row("BUY", 100, 0.50, now - 5, tx="0x1")])
+        engine.cycle()
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertAlmostEqual(pos["shares"], 4.0)
+        self.assertAlmostEqual(pos["basis_shares"], 4.0)
+
+        store.queue_manual_sell(
+            target="0xabc", condition_id="c1", token_id="t1",
+            pct=0.25, shares_requested=1.0,
+        )
+        store.commit()
+        engine.process_manual_sells()
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertAlmostEqual(pos["shares"], 3.0)
+        self.assertAlmostEqual(pos["basis_shares"], 4.0)
+        self.assertAlmostEqual(pos["manual_credit"], 1.0)
+
+        # Target sells 50%: the manual 1-share credit covers part of it.
+        engine.data.rows = [trade_row("SELL", 50, 0.60, now - 4, tx="0x2")]
+        engine.cycle()
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertAlmostEqual(pos["shares"], 2.0)
+        self.assertAlmostEqual(pos["basis_shares"], 2.0)
+        self.assertAlmostEqual(pos["manual_credit"], 0.0)
+
+        # Target exits: all remaining shares must go.
+        engine.data.rows = [trade_row("SELL", 50, 0.60, now - 3, tx="0x3")]
+        engine.cycle()
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertEqual(pos["status"], "CLOSED")
+        self.assertAlmostEqual(pos["shares"], 0.0)
+
+    def test_manual_credit_absorbed_target_sell_then_full_exit(self):
+        now = int(time.time())
+        engine, store = self.make_engine(
+            [trade_row("BUY", 100, 0.50, now - 5, tx="0x1")])
+        engine.cycle()
+        store.queue_manual_sell(
+            target="0xabc", condition_id="c1", token_id="t1",
+            pct=0.5, shares_requested=2.0,
+        )
+        store.commit()
+        engine.process_manual_sells()
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertAlmostEqual(pos["shares"], 2.0)
+        self.assertAlmostEqual(pos["basis_shares"], 4.0)
+        self.assertAlmostEqual(pos["manual_credit"], 2.0)
+
+        # Target sells 25%: equivalent 1 share, fully covered by credit.
+        engine.data.rows = [trade_row("SELL", 25, 0.60, now - 4, tx="0x2")]
+        engine.cycle()
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertAlmostEqual(pos["shares"], 2.0)
+        self.assertAlmostEqual(pos["basis_shares"], 3.0)
+        self.assertAlmostEqual(pos["manual_credit"], 1.0)
+        self.assertEqual(store.all_signals()[-1]["reason"],
+                         "manual_credit_absorbed")
+
+        # Target exits: all remaining shares go.
+        engine.data.rows = [trade_row("SELL", 75, 0.60, now - 3, tx="0x3")]
+        engine.cycle()
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertEqual(pos["status"], "CLOSED")
+        self.assertAlmostEqual(pos["shares"], 0.0)
+
     def test_hot_reload_updates_paper_executor_config(self):
         engine, store = self.make_engine([])
         self.assertIsInstance(engine.executor, PaperExecutor)

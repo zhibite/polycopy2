@@ -367,13 +367,16 @@ class LiveExecutor:
             )
             self.store.commit()
         else:
+            is_manual = str(order.get("dedupe_key") or "").startswith("manual:")
             applied = self.store.apply_sell(
                 ts=ts, target=str(order["target"]), signal_id=None,
                 condition_id=str(order["condition_id"]),
                 token_id=str(order["token_id"]),
                 outcome=str(order.get("outcome") or ""),
                 shares=fill.shares, price=fill.price, fee=fill.fee,
-                note="reconciled", order_id=fill.order_id,
+                note="manual_sell" if is_manual else "reconciled",
+                order_id=fill.order_id, manual=is_manual,
+                kind="MANUAL" if is_manual else "COPY",
             )
             self.store.commit()
             if applied is None:

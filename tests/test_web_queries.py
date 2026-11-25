@@ -64,6 +64,35 @@ class WebQueriesTest(unittest.TestCase):
         self.assertEqual(positions["rows"][0]["title"], "M")
         self.assertEqual(positions["status"], "open")
 
+    def test_queue_manual_sell(self):
+        self._buy()
+        self.store.commit()
+        pos = self.store.position("t", "c", "k")
+        request_id, error = queries.queue_manual_sell(pos["id"], 0.25)
+        self.assertIsNone(error)
+        self.assertIsNotNone(request_id)
+        req = self.store.manual_sell(request_id)
+        self.assertEqual(req["status"], "PENDING")
+        self.assertAlmostEqual(req["shares_requested"], 2.5)
+        self.assertAlmostEqual(req["remaining_shares"], 2.5)
+        self.assertEqual(self.store.pending_manual_sells()[0]["id"], request_id)
+
+    def test_fill_type_filter(self):
+        self._buy()
+        self.store.apply_sell(
+            ts=1001, target="t", signal_id=None, condition_id="c",
+            token_id="k", outcome="Yes", shares=2, price=0.6, fee=0.0,
+            manual=True, kind="MANUAL",
+        )
+        self.store.commit()
+        conn = queries.connect()
+        self.addCleanup(queries.close, conn)
+        self.assertEqual(queries.fills_page(conn, fill_type="copy_buy")["total"], 1)
+        self.assertEqual(queries.fills_page(conn, fill_type="copy_sell")["total"], 0)
+        self.assertEqual(queries.fills_page(conn, fill_type="manual_sell")["total"], 1)
+        manual = queries.fills_page(conn, fill_type="manual_sell")["rows"][0]
+        self.assertEqual(manual["kind"], "MANUAL")
+
     def test_signal_summary(self):
         self.store.record_signal(
             target="t", dedupe_key="a", ts=1, latency_seconds=1.0, side="BUY",
