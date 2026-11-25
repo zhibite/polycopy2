@@ -425,7 +425,8 @@ def signals(request: Request, copied: str = "", reason: str = "", page: int = 1)
 
 
 @app.get("/config", response_class=HTMLResponse)
-def config_page(request: Request, saved: str = "", mode_changed: str = ""):
+def config_page(request: Request, saved: str = "", mode_changed: str = "",
+                restart_requested: str = "", restart_error: str = ""):
     redirect = _login_redirect(request)
     if redirect:
         return redirect
@@ -442,6 +443,7 @@ def config_page(request: Request, saved: str = "", mode_changed: str = ""):
         request, "config.html", "config", cfg=cfg, target_name=name,
         target=cfg.targets[name], csrf=session.csrf if session else "",
         saved=bool(saved), mode_changed=bool(mode_changed), error=None,
+        restart_requested=bool(restart_requested), restart_error=restart_error,
         config_path=str(queries.CONFIG_PATH), db_path=str(queries.DB_PATH),
         run=cfg.run, live=cfg.live,
     )
@@ -632,8 +634,15 @@ async def config_save(request: Request):
             config_path=str(queries.CONFIG_PATH),
             db_path=str(queries.DB_PATH), run=run_cfg, live=live,
         )
-    restart = (run_cfg != cfg.run or live != cfg.live)
-    suffix = "&mode_changed=1" if restart else ""
+    needs_restart = (run_cfg != cfg.run or live != cfg.live)
+    restart_error = None
+    if _fbool(form, "restart"):
+        restart_error = queries.request_restart()
+    suffix = "&mode_changed=1" if needs_restart else ""
+    if _fbool(form, "restart") and not restart_error:
+        suffix += "&restart_requested=1"
+    if restart_error:
+        suffix += "&restart_error=" + urllib.parse.quote(str(restart_error))
     return RedirectResponse(f"/config?saved=1{suffix}", status_code=303)
 
 

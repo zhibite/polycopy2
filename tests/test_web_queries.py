@@ -77,6 +77,11 @@ class WebQueriesTest(unittest.TestCase):
         self.assertAlmostEqual(req["remaining_shares"], 2.5)
         self.assertEqual(self.store.pending_manual_sells()[0]["id"], request_id)
 
+    def test_request_restart_writes_kv(self):
+        error = queries.request_restart()
+        self.assertIsNone(error)
+        self.assertTrue(self.store.get_kv("bot:restart_request"))
+
     def test_fill_type_filter(self):
         self._buy()
         self.store.apply_sell(

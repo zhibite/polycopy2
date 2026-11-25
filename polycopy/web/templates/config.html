@@ -14,7 +14,11 @@
 </div>
 
 {% if saved %}
-  {% if mode_changed %}
+  {% if restart_error %}
+    <div class="alert warn">配置已保存，但重启请求提交失败：{{ restart_error }}</div>
+  {% elif restart_requested %}
+    <div class="alert ok">配置已保存。重启请求已提交，bot 将在几秒内重启并加载新配置。</div>
+  {% elif mode_changed %}
     <div class="alert warn">配置已保存。运行模式或实盘设置已变更，需要重启 bot 才会生效；重启前仍按旧模式运行。</div>
   {% else %}
     <div class="alert ok">配置已保存。策略参数将在约 {{ cfg.paper.poll_seconds }} 秒内自动生效。</div>
@@ -362,8 +366,9 @@
   </div>
 
   <div class="save-bar">
-    <span class="save-msg">保存后约 {{ cfg.paper.poll_seconds }} 秒内生效 · 修改前会自动备份为 .bak</span>
+    <span class="save-msg">保存后约 {{ cfg.paper.poll_seconds }} 秒内生效 · 修改前会自动备份为 .bak · 「保存并重启」会短暂中断监控</span>
     <a href="/config" class="btn btn-ghost" style="text-decoration:none;display:inline-block;padding:9px 16px;border-radius:7px">放弃修改</a>
+    <button class="btn btn-ghost" type="submit" name="restart" value="1">保存并重启 bot</button>
     <button class="btn btn-primary" type="submit">保存配置</button>
   </div>
 </form>

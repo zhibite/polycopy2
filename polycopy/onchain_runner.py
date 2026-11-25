@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -22,6 +24,7 @@ from .onchain import (
 from .store import Store
 
 CURSOR_KEY = "onchain:last_block"
+RESTART_KEY = "bot:restart_request"
 
 
 class OnchainRunner:
@@ -49,12 +52,21 @@ class OnchainRunner:
         self._cursor_pending: int | None = None
         self._stop = threading.Event()
         self._maintenance_thread: threading.Thread | None = None
+        self._restart_requested = False
 
     def run(self) -> int:
         try:
             self.engine.executor.reconcile()
         except Exception:
             self.log.exception("startup executor reconciliation failed")
+        # A restart request left over from a previous process should not make
+        # a fresh start immediately bounce.  Requests are only honoured while
+        # this process is running.
+        try:
+            self.store.set_kv(RESTART_KEY, "")
+            self.store.commit()
+        except Exception:
+            self.log.exception("could not clear stale restart request")
         self.feed.start()
         self._start_maintenance()
         self.log.info(
@@ -70,6 +82,10 @@ class OnchainRunner:
                     except Exception:
                         self.log.exception("fill handling failed tx=%s log=%d",
                                            fill.tx_hash, fill.log_index)
+
+                if self._restart_requested:
+                    self.log.warning("restart request observed; stopping feed")
+                    break
 
                 now = time.time()
                 if now - self._last_maint >= 2.0:
@@ -96,6 +112,25 @@ class OnchainRunner:
             if self._trace is not None:
                 self._trace.close()
                 self._trace = None
+        if self._restart_requested:
+            return self._reexec()
+        return 0
+
+    def _reexec(self) -> int:
+        """Replace the process image with the same command, minus --mode.
+
+        ``--mode`` is intentionally dropped so a dashboard restart honours
+        ``[run].mode`` from the freshly saved config instead of the mode the
+        process happened to start with.
+        """
+        args = _strip_mode_args(list(sys.argv[1:]))
+        argv = [sys.executable, "-m", "polycopy"] + args
+        self.log.warning("re-executing: %s", " ".join(argv))
+        try:
+            os.execv(sys.executable, argv)
+        except Exception:
+            self.log.exception("re-exec failed")
+            return 1
         return 0
 
     # ----------------------------------------------------------- maintenance
@@ -129,12 +164,28 @@ class OnchainRunner:
             while not self._stop.wait(5.0):
                 try:
                     engine.maybe_reload_config()
+                    if self._consume_restart(store):
+                        self._restart_requested = True
+                        self.log.warning("restart requested via dashboard")
+                        self._stop.set()
+                        return
                     engine.maintenance()
                 except Exception:
                     self.log.exception("background maintenance failed")
         finally:
             store.commit()
             store.close()
+
+    def _consume_restart(self, store: Store) -> bool:
+        try:
+            if not store.get_kv(RESTART_KEY):
+                return False
+            store.set_kv(RESTART_KEY, "")
+            store.commit()
+            return True
+        except Exception:
+            self.log.exception("restart request check failed")
+            return False
 
     # ------------------------------------------------------------------ fills
     def _handle(self, fill: OrderFill) -> None:
@@ -243,6 +294,23 @@ class OnchainRunner:
             self._processed, self._failed, stats["errors"],
             stats["reconnects"],
         )
+
+
+def _strip_mode_args(args: list[str]) -> list[str]:
+    """Remove --mode/--mode=... so a re-exec follows [run].mode in config."""
+    cleaned: list[str] = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--mode":
+            index += 2
+            continue
+        if arg.startswith("--mode="):
+            index += 1
+            continue
+        cleaned.append(arg)
+        index += 1
+    return cleaned
 
 
 def build_and_run(engine: Engine, settings: OnchainSettings, *,

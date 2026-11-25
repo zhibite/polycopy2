@@ -176,6 +176,29 @@ def queue_manual_sell(position_id: int, pct: float) -> tuple[int | None, str | N
         close(conn)
 
 
+def request_restart() -> str | None:
+    """Queue a bot restart in the database the dashboard is watching."""
+    conn = connect_write()
+    if conn is None:
+        return "数据库不可用"
+    try:
+        conn.execute(
+            "INSERT INTO kv(key, value) VALUES('bot:restart_request', ?)"
+            " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (str(int(time.time())),),
+        )
+        conn.commit()
+        return None
+    except sqlite3.Error as exc:
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+        return str(exc)
+    finally:
+        close(conn)
+
+
 def pending_manual_sells(conn: sqlite3.Connection | None,
                          limit: int = 20) -> list[dict[str, Any]]:
     return _all(

@@ -8,6 +8,7 @@ from polycopy.onchain import (
     decode_order_filled,
     pad_address,
 )
+from polycopy.onchain_runner import _strip_mode_args
 from polycopy.rules import dedupe_key
 
 # Real V2 logs for 0xf705fa045201391d9632b7f3cde06a5e24453ca7.
@@ -229,6 +230,24 @@ class FeedTest(unittest.TestCase):
                                ws_urls=[], start_block=head - 1)
         feed._catch_up()
         self.assertIsNone(feed.get(timeout=0))
+
+
+class RestartArgsTest(unittest.TestCase):
+    def test_strips_mode_override(self):
+        self.assertEqual(
+            _strip_mode_args(["onchain", "run", "--mode", "live",
+                              "--config", "live.toml"]),
+            ["onchain", "run", "--config", "live.toml"],
+        )
+        self.assertEqual(
+            _strip_mode_args(["onchain", "run", "--mode=paper",
+                              "--config", "live.toml"]),
+            ["onchain", "run", "--config", "live.toml"],
+        )
+        self.assertEqual(
+            _strip_mode_args(["onchain", "run", "--config", "live.toml"]),
+            ["onchain", "run", "--config", "live.toml"],
+        )
 
 
 if __name__ == "__main__":
