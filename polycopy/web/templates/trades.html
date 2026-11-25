@@ -89,8 +89,8 @@
               {% endif %}
             </td>
             <td title="{{ f.title }}">
-              {% if f.event_slug %}
-                <a class="market-link" href="{{ f.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ (f.title or f.condition_id)|short_title(58) }}</a>
+              {% if f.event_slug or f.market_slug %}
+                <a class="market-link" href="{{ f.event_slug|market_url(f.market_slug) }}" target="_blank" rel="noopener noreferrer">{{ (f.title or f.condition_id)|short_title(58) }}</a>
               {% else %}
                 {{ (f.title or f.condition_id)|short_title(58) }}
               {% endif %}

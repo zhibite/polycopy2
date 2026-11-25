@@ -217,7 +217,8 @@ def recent_fills(conn: sqlite3.Connection | None,
                  limit: int = 15) -> list[dict[str, Any]]:
     return _all(
         conn,
-        "SELECT f.*, p.title AS title, p.event_slug AS event_slug"
+        "SELECT f.*, p.title AS title, p.event_slug AS event_slug,"
+        " p.slug AS market_slug"
         " FROM fills f LEFT JOIN positions p ON p.target = f.target"
         " AND p.condition_id = f.condition_id AND p.token_id = f.token_id"
         " ORDER BY f.ts DESC, f.id DESC LIMIT ?",
@@ -378,7 +379,8 @@ def fills_page(conn: sqlite3.Connection | None, *, side: str = "",
     total = int(_scalar(conn, "SELECT COUNT(*) FROM fills f" + clause, params))
     rows = _all(
         conn,
-        "SELECT f.*, p.title AS title, p.event_slug AS event_slug"
+        "SELECT f.*, p.title AS title, p.event_slug AS event_slug,"
+        " p.slug AS market_slug"
         " FROM fills f LEFT JOIN positions p ON p.target = f.target"
         " AND p.condition_id = f.condition_id AND p.token_id = f.token_id"
         + clause + " ORDER BY f.ts DESC, f.id DESC LIMIT ? OFFSET ?",
@@ -437,18 +439,21 @@ def signals_page(conn: sqlite3.Connection | None, *, copied: str = "",
     where: list[str] = []
     params: list[Any] = []
     if copied in ("1", "0"):
-        where.append("copied = ?")
+        where.append("s.copied = ?")
         params.append(int(copied))
     if reason:
-        where.append("reason = ?")
+        where.append("s.reason = ?")
         params.append(reason)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     offset, limit = _page_bounds(page, per_page)
-    total = int(_scalar(conn, "SELECT COUNT(*) FROM signals" + clause, params))
+    total = int(_scalar(conn, "SELECT COUNT(*) FROM signals s" + clause, params))
     rows = _all(
         conn,
-        "SELECT * FROM signals" + clause
-        + " ORDER BY ts DESC, id DESC LIMIT ? OFFSET ?",
+        "SELECT s.*, tf.slug AS market_slug,"
+        " tf.event_slug AS target_event_slug"
+        " FROM signals s LEFT JOIN target_fills tf"
+        " ON tf.dedupe_key = s.dedupe_key" + clause
+        + " ORDER BY s.ts DESC, s.id DESC LIMIT ? OFFSET ?",
         params + [limit, offset],
     )
     return {

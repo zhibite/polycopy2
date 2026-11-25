@@ -101,8 +101,8 @@
             <td class="mono">{{ s.ts|dt_bj }}</td>
             <td><span class="pill {{ 'buy' if s.side == 'BUY' else 'sell' }}">{{ '买入' if s.side == 'BUY' else '卖出' }}</span></td>
             <td title="{{ s.title }}">
-              {% if s.event_slug %}
-                <a class="market-link" href="{{ s.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ (s.title or s.condition_id)|short_title(52) }}</a>
+              {% if s.event_slug or s.slug or s.market_slug %}
+                <a class="market-link" href="{{ (s.event_slug or s.target_event_slug)|market_url(s.slug or s.market_slug) }}" target="_blank" rel="noopener noreferrer">{{ (s.title or s.condition_id)|short_title(52) }}</a>
               {% else %}
                 {{ (s.title or s.condition_id)|short_title(52) }}
               {% endif %}

@@ -321,6 +321,7 @@ class Engine:
                 outcome=str(row.get("outcome") or ""),
                 title=str(row.get("title") or ""),
                 event_slug=str(row.get("event_slug") or ""),
+                slug=str(row.get("slug") or ""),
                 shares=fill.shares, price=fill.price, fee=fill.fee,
                 order_id=fill.order_id,
             )
@@ -815,6 +816,7 @@ class Engine:
             usd=rules.target_usd(row),
             title=str(row.get("title") or ""),
             event_slug=str(row.get("event_slug") or ""),
+            slug=str(row.get("slug") or ""),
             copied=copied, reason=reason, our_shares=our_shares,
             our_price=our_price, our_notional=our_notional, our_fee=our_fee,
             source=source,

@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS signals (
     usd REAL,
     title TEXT,
     event_slug TEXT,
+    slug TEXT NOT NULL DEFAULT '',
     copied INTEGER NOT NULL DEFAULT 0,
     reason TEXT,
     our_shares REAL,
@@ -82,6 +83,7 @@ CREATE TABLE IF NOT EXISTS positions (
     outcome TEXT,
     title TEXT,
     event_slug TEXT,
+    slug TEXT NOT NULL DEFAULT '',
     shares REAL NOT NULL DEFAULT 0,
     basis_shares REAL NOT NULL DEFAULT 0,
     manual_credit REAL NOT NULL DEFAULT 0,
@@ -265,6 +267,26 @@ class Store:
                 "ALTER TABLE signals ADD COLUMN source TEXT NOT NULL"
                 " DEFAULT 'data_api'"
             )
+        if "slug" not in signal_cols:
+            self.conn.execute(
+                "ALTER TABLE signals ADD COLUMN slug TEXT NOT NULL DEFAULT ''")
+            self.conn.execute(
+                "UPDATE signals SET slug = COALESCE(("
+                " SELECT tf.slug FROM target_fills tf"
+                " WHERE tf.dedupe_key = signals.dedupe_key"
+                " AND tf.slug != '' LIMIT 1), '')"
+                " WHERE slug = ''")
+        if "slug" not in pos_cols:
+            self.conn.execute(
+                "ALTER TABLE positions ADD COLUMN slug TEXT NOT NULL DEFAULT ''")
+            self.conn.execute(
+                "UPDATE positions SET slug = COALESCE(("
+                " SELECT tf.slug FROM target_fills tf"
+                " WHERE tf.target = positions.target"
+                " AND tf.condition_id = positions.condition_id"
+                " AND tf.token_id = positions.token_id"
+                " AND tf.slug != '' ORDER BY tf.ts DESC LIMIT 1), '')"
+                " WHERE slug = ''")
 
     # ------------------------------------------------------------------ account
     def ensure_account(self, starting_cash: float) -> None:
@@ -677,16 +699,16 @@ class Store:
                       our_price: float | None = None,
                       our_notional: float | None = None,
                       our_fee: float | None = None,
-                      source: str = "data_api") -> None:
+                      source: str = "data_api", slug: str = "") -> None:
         self.conn.execute(
             "INSERT OR IGNORE INTO signals(target, dedupe_key, ts, latency_seconds,"
             " side, condition_id, token_id, outcome, price, size, usd, title,"
-            " event_slug, copied, reason, our_shares, our_price, our_notional,"
-            " our_fee, source, created_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " event_slug, slug, copied, reason, our_shares, our_price,"
+            " our_notional, our_fee, source, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 target, dedupe_key, ts, latency_seconds, side, condition_id,
-                token_id, outcome, price, size, usd, title, event_slug,
+                token_id, outcome, price, size, usd, title, event_slug, slug,
                 1 if copied else 0, reason, our_shares, our_price, our_notional,
                 our_fee, source, int(time.time()),
             ),
@@ -749,7 +771,8 @@ class Store:
     def apply_buy(self, *, ts: int, target: str, signal_id: int | None,
                   condition_id: str, token_id: str, outcome: str, title: str,
                   event_slug: str, shares: float, price: float,
-                  fee: float, order_id: int | None = None) -> None:
+                  fee: float, order_id: int | None = None,
+                  slug: str = "") -> None:
         if shares <= 0:
             return
         notional = shares * price
@@ -771,26 +794,27 @@ class Store:
             new_avg = (float(row["avg_cost"]) * old_shares + total_cost) / new_shares
             self.conn.execute(
                 "UPDATE positions SET shares = ?, basis_shares = ?,"
-                " avg_cost = ?, updated_at = ? WHERE id = ?",
-                (new_shares, new_basis, new_avg, ts, row["id"]),
+                " avg_cost = ?, slug = COALESCE(NULLIF(?, ''), slug),"
+                " updated_at = ? WHERE id = ?",
+                (new_shares, new_basis, new_avg, slug, ts, row["id"]),
             )
         elif row:
             self.conn.execute(
                 "UPDATE positions SET status = 'OPEN', shares = ?,"
                 " basis_shares = ?, manual_credit = 0, avg_cost = ?,"
-                " outcome = ?, title = ?, event_slug = ?, opened_at = ?,"
-                " updated_at = ? WHERE id = ?",
+                " outcome = ?, title = ?, event_slug = ?, slug = ?,"
+                " opened_at = ?, updated_at = ? WHERE id = ?",
                 (shares, shares, total_cost / shares, outcome, title, event_slug,
-                 ts, ts, row["id"]),
+                 slug, ts, ts, row["id"]),
             )
         else:
             self.conn.execute(
                 "INSERT INTO positions(target, condition_id, token_id, outcome,"
-                " title, event_slug, shares, basis_shares, manual_credit,"
+                " title, event_slug, slug, shares, basis_shares, manual_credit,"
                 " avg_cost, realized_pnl, opened_at, updated_at, status)"
-                " VALUES (?,?,?,?,?,?,?,?,0,?,0,?,?,'OPEN')",
+                " VALUES (?,?,?,?,?,?,?,?,?,0,?,0,?,?,'OPEN')",
                 (target, condition_id, token_id, outcome, title, event_slug,
-                 shares, shares, total_cost / shares, ts, ts),
+                 slug, shares, shares, total_cost / shares, ts, ts),
             )
         self.conn.execute(
             "INSERT INTO fills(ts, target, signal_id, order_id, condition_id,"

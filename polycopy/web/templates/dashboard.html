@@ -105,8 +105,8 @@
           {% set upnl = p.shares * (mark - p.avg_cost) %}
           <tr>
             <td title="{{ p.title }}">
-              {% if p.event_slug %}
-                <a class="market-link" href="{{ p.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ p.title|short_title(62) }}</a>
+              {% if p.event_slug or p.slug %}
+                <a class="market-link" href="{{ p.event_slug|market_url(p.slug) }}" target="_blank" rel="noopener noreferrer">{{ p.title|short_title(62) }}</a>
               {% else %}
                 {{ p.title|short_title(62) }}
               {% endif %}
@@ -141,8 +141,8 @@
             <td class="mono">{{ f.ts|dt_bj }}</td>
             <td><span class="pill {{ 'buy' if f.side == 'BUY' else 'sell' }}">{{ '买入' if f.side == 'BUY' else '卖出' }}</span></td>
             <td title="{{ f.title }}">
-              {% if f.event_slug %}
-                <a class="market-link" href="{{ f.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ (f.title or f.condition_id)|short_title(52) }}</a>
+              {% if f.event_slug or f.market_slug %}
+                <a class="market-link" href="{{ f.event_slug|market_url(f.market_slug) }}" target="_blank" rel="noopener noreferrer">{{ (f.title or f.condition_id)|short_title(52) }}</a>
               {% else %}
                 {{ (f.title or f.condition_id)|short_title(52) }}
               {% endif %}

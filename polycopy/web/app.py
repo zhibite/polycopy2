@@ -107,12 +107,16 @@ def _short_title(value: Any, length: int = 58) -> str:
     return text if len(text) <= length else text[: length - 1] + "…"
 
 
-def _market_url(event_slug: Any) -> str | None:
-    slug = str(event_slug or "").strip()
-    if not slug:
+def _market_url(event_slug: Any, market_slug: Any = None) -> str | None:
+    market = str(market_slug or "").strip()
+    if market:
+        return "https://polymarket.com/market/" + urllib.parse.quote(
+            market, safe="-_.~")
+    event = str(event_slug or "").strip()
+    if not event:
         return None
     return "https://polymarket.com/event/" + urllib.parse.quote(
-        slug, safe="-_.~")
+        event, safe="-_.~")
 
 
 REASON_CN = {

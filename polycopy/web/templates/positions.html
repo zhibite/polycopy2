@@ -74,8 +74,8 @@
               </span>
             </td>
             <td title="{{ p.title }}">
-              {% if p.event_slug %}
-                <a class="market-link" href="{{ p.event_slug|market_url }}" target="_blank" rel="noopener noreferrer">{{ p.title|short_title(60) }}</a>
+              {% if p.event_slug or p.slug %}
+                <a class="market-link" href="{{ p.event_slug|market_url(p.slug) }}" target="_blank" rel="noopener noreferrer">{{ p.title|short_title(60) }}</a>
               {% else %}
                 {{ p.title|short_title(60) }}
               {% endif %}
