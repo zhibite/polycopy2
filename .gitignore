@@ -11,3 +11,7 @@ probe_*/
 .pytest_cache/
 .env
 .env.docker
+docs/
+configs/
+test/
+scripts/
