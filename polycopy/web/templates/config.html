@@ -30,6 +30,9 @@
   运行模式、dry-run、实盘上限与密钥变量名属于重启项。
 </div>
 
+<form method="post" action="/config">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
 <div class="config-group">
   <h2><span class="dot"></span>运行模式</h2>
   <div class="config-grid">
@@ -142,9 +145,6 @@
     </div>
   </div>
 </div>
-
-<form method="post" action="/config">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
 
   <div class="config-group">
     <h2><span class="dot"></span>账户与目标钱包</h2>
