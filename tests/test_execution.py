@@ -7,7 +7,7 @@ from polycopy.config import LiveConfig, PaperConfig
 from polycopy.execution import (
     Fill, LiveExecutor, PaperExecutor, TradeIntent,
 )
-from polycopy.live_client import LiveOrderResult
+from polycopy.live_client import LiveOrderResult, _market_order_amount
 from polycopy.store import Store
 
 
@@ -91,6 +91,17 @@ def intent(side="BUY", shares=10.0, price=0.50, dedupe="d1"):
         fee_rate=0.01, max_spend=1000.0, max_market=1000.0,
         min_notional=2.0,
     )
+
+
+class MarketOrderPrecisionTest(unittest.TestCase):
+    def test_buy_amount_is_usdc_with_two_decimals(self):
+        # The CLOB rejected 25.89 * 0.374 = 9.68286 USDC (5 decimals).
+        self.assertAlmostEqual(
+            _market_order_amount("BUY", 0.374, 25.89), 9.68)
+
+    def test_sell_amount_is_shares_with_two_decimals(self):
+        self.assertAlmostEqual(
+            _market_order_amount("SELL", 0.374, 25.897), 25.89)
 
 
 class PaperExecutorTest(unittest.TestCase):

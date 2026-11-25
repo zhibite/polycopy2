@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import math
 import os
 import time
 from dataclasses import dataclass
@@ -166,13 +167,23 @@ class SdkClobGateway:
                 self.log.debug("order options failed token=%s", token_id,
                                exc_info=True)
                 options = None
+        # CLOB market orders use USDC for BUY and shares for SELL.  The
+        # maker/taker amount precision is stricter than a plain limit order:
+        # market BUY maker amount is max 2 decimals, taker amount max 5.
+        # create_market_order applies those roundings; create_order with
+        # OrderArgs produced 5-decimal USDC and was rejected with
+        # "invalid amounts ... max accuracy of 2 decimals".
+        amount = _market_order_amount(side, price, size)
+        if amount <= 0:
+            raise ValueError("order amount rounded to zero")
         args = {
             "price": float(price),
-            "size": float(size),
+            "amount": amount,
             "side": sdk.Side.BUY if side == "BUY" else sdk.Side.SELL,
+            "order_type": sdk.OrderType.FAK,
         }
         try:
-            params = inspect.signature(sdk.OrderArgs).parameters
+            params = inspect.signature(sdk.MarketOrderArgs).parameters
         except (TypeError, ValueError):
             params = {}
         # Protocol V2 builds may call the outcome id position_id.
@@ -180,14 +191,14 @@ class SdkClobGateway:
             args["position_id"] = token_id
         else:
             args["token_id"] = token_id
-        order_args = sdk.OrderArgs(**args)
+        order_args = sdk.MarketOrderArgs(**args)
         if options is not None:
             try:
-                signed = client.create_order(order_args, options=options)
+                signed = client.create_market_order(order_args, options=options)
             except TypeError:
-                signed = client.create_order(order_args)
+                signed = client.create_market_order(order_args)
         else:
-            signed = client.create_order(order_args)
+            signed = client.create_market_order(order_args)
         client_id = _order_hash(signed)
         if on_prepared is not None:
             # Record PREPARED even without a hash: the duplicate guard must
@@ -321,6 +332,12 @@ class SdkClobGateway:
             self.log.exception("redeem failed condition=%s", condition_id)
             return False
         return bool(result)
+
+
+def _market_order_amount(side: str, price: float, size: float) -> float:
+    """CLOB market-order precision: BUY maker USDC 2dp, SELL maker shares 2dp."""
+    value = float(size) * float(price) if side == "BUY" else float(size)
+    return math.floor(value * 100.0 + 1e-9) / 100.0
 
 
 def _order_hash(signed: Any) -> str | None:
