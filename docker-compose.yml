@@ -13,11 +13,13 @@ services:
       WEB_PASSWORD: "${WEB_PASSWORD:-}"
       WEB_SESSION_TTL_S: "${WEB_SESSION_TTL_S:-604800}"
       POLY_PROJECT_DIR: /app/project
-      POLY_DB_PATH: /app/project/data/paper_f705.db
-      POLY_CONFIG_PATH: /app/project/configs/paper_f705.toml
+      # These must be injected here: the dashboard reads them at import time,
+      # and hardcoded values would override Coolify's environment panel.
+      POLY_DB_PATH: "${POLY_DB_PATH:-/app/project/data/live_f705.db}"
+      POLY_CONFIG_PATH: "${POLY_CONFIG_PATH:-/app/project/configs/live_f705.toml}"
 
     volumes:
-      # The paper bot runs on the host and writes this SQLite DB. Mount the
+      # The bot runs on the host and writes this SQLite DB. Mount the
       # project dir read-write so the dashboard can also edit the TOML config.
       # Override POLY_HOST_DIR if the project lives somewhere else.
       - "${POLY_HOST_DIR:-/root/polycopy}:/app/project"
