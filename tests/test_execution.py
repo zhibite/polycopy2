@@ -227,6 +227,38 @@ class LiveExecutorTest(unittest.TestCase):
         self.assertAlmostEqual(result.filled_shares, 10.0)
         self.assertAlmostEqual(gateway.orders[0][3], 10.0)
 
+    def test_no_asks_at_limit_reports_no_depth(self):
+        store, tmp = make_store(self)
+        cfg = self.live_cfg(tmp, dry_run=False)
+        executor = LiveExecutor(store, cfg, FakeClob(bid=0.40, ask=0.60),
+                                gateway=FakeGateway(), dry_run=False)
+        with self.assertLogs("polycopy.execution.live", level="INFO") as logs:
+            result = executor.buy(intent(price=0.50))
+        self.assertEqual(result.status, "rejected")
+        self.assertEqual(result.reason, "no_depth_at_limit")
+        self.assertTrue(any("limit=0.5000" in line and "depth=0.00" in line
+                            for line in logs.output))
+        self.assertEqual(store.orders(mode="live"), [])
+
+    def test_thin_depth_reports_below_min_size(self):
+        store, tmp = make_store(self)
+        cfg = self.live_cfg(tmp, dry_run=False, min_order_shares=5.0,
+                            max_book_depth_pct=0.25)
+
+        class ThinBook(FakeClob):
+            def book(self, token):
+                return {
+                    "bids": [{"price": "0.49", "size": "1000"}],
+                    "asks": [{"price": "0.50", "size": "10"}],
+                    "tick_size": "0.001",
+                }
+
+        executor = LiveExecutor(store, cfg, ThinBook(), gateway=FakeGateway(),
+                                dry_run=False)
+        result = executor.buy(intent(price=0.50))
+        self.assertEqual(result.status, "rejected")
+        self.assertEqual(result.reason, "below_min_size")
+
     def test_daily_loss_limit_blocks_new_buys(self):
         store, tmp = make_store(self)
         store.apply_buy(

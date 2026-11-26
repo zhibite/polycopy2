@@ -177,6 +177,7 @@ REASON_CN = {
     "no_liquidity": "无流动性",
     "insufficient_depth": "深度不足",
     "below_min_size": "低于最小下单量",
+    "no_depth_at_limit": "限价内无深度",
     "manual_credit_absorbed": "手动卖出已覆盖本次目标卖出",
     "sells_disabled": "未开启跟卖",
     "target_no_position": "目标无仓位",

@@ -208,10 +208,17 @@ class LiveExecutor:
                 return ExecutionResult(status="rejected", reason=blocked)
             tick = self._tick_size(intent.token_id)
             limit = _floor_tick(intent.limit_price, tick)
-            shares = self._cap_shares(intent, limit)
+            shares, cap_reason, depth = self._cap_shares(intent, limit)
             if shares <= 0:
+                self.log.info(
+                    "live buy skipped reason=%s token=%s limit=%.4f"
+                    " depth=%s wanted=%.4f",
+                    cap_reason or "below_min_size", intent.token_id[:16],
+                    limit, "?" if depth is None else f"{depth:.2f}",
+                    intent.shares,
+                )
                 return ExecutionResult(status="rejected",
-                                       reason="below_min_size")
+                                       reason=cap_reason or "below_min_size")
             order = self.store.create_order(
                 dedupe_key=intent.dedupe_key, target=intent.target,
                 mode="live", side="BUY", condition_id=intent.condition_id,
@@ -440,7 +447,16 @@ class LiveExecutor:
             return "max_total_exposure"
         return None
 
-    def _cap_shares(self, intent: TradeIntent, limit: float) -> float:
+    def _cap_shares(
+            self, intent: TradeIntent, limit: float,
+    ) -> tuple[float, str | None, float | None]:
+        """Return (shares, reject_reason, visible_depth).
+
+        A zero-size result distinguishes "no asks at/below our limit"
+        (``no_depth_at_limit``) from every other size constraint
+        (``below_min_size``) so the dashboard does not blame the target
+        notional for a book that simply moved away.
+        """
         price = max(1e-6, limit)
         shares = max(0.0, intent.shares)
         if self.cfg.max_order_usd > 0:
@@ -458,8 +474,11 @@ class LiveExecutor:
             shares = min(shares, depth * self.cfg.max_book_depth_pct)
         shares = _round_shares(shares)
         if shares < self.cfg.min_order_shares:
-            return 0.0
-        return shares
+            reason = ("no_depth_at_limit"
+                      if depth is not None and depth <= 0
+                      else "below_min_size")
+            return 0.0, reason, depth
+        return shares, None, depth
 
     def _book_depth(self, token_id: str, limit: float,
                     side: str) -> float | None:
