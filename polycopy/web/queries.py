@@ -450,9 +450,16 @@ def signals_page(conn: sqlite3.Connection | None, *, copied: str = "",
     rows = _all(
         conn,
         "SELECT s.*, tf.slug AS market_slug,"
-        " tf.event_slug AS target_event_slug"
+        " tf.event_slug AS target_event_slug,"
+        " tb.avg_buy_price AS target_avg_buy"
         " FROM signals s LEFT JOIN target_fills tf"
-        " ON tf.dedupe_key = s.dedupe_key" + clause
+        " ON tf.dedupe_key = s.dedupe_key"
+        " LEFT JOIN ("
+        "   SELECT target, token_id,"
+        "          SUM(usd) / NULLIF(SUM(size), 0) AS avg_buy_price"
+        "   FROM target_fills WHERE side = 'BUY'"
+        "   GROUP BY target, token_id"
+        " ) tb ON tb.target = s.target AND tb.token_id = s.token_id" + clause
         + " ORDER BY s.ts DESC, s.id DESC LIMIT ? OFFSET ?",
         params + [limit, offset],
     )

@@ -96,6 +96,26 @@ class WebQueriesTest(unittest.TestCase):
         page = queries.signals_page(conn, page=1, per_page=20)
         self.assertEqual(page["rows"][0]["market_slug"], "test-market")
         self.assertEqual(page["rows"][0]["slug"], "test-market")
+        self.assertAlmostEqual(page["rows"][0]["target_avg_buy"], 0.5)
+
+    def test_signals_page_target_avg_buy(self):
+        for key, price in (("a", 0.4), ("b", 0.6)):
+            self.store.insert_target_fill(
+                key, "t",
+                {"type": "TRADE", "timestamp": 10, "condition_id": "c",
+                 "token_id": "k", "side": "BUY", "price": price, "size": 10},
+            )
+        self.store.record_signal(
+            target="t", dedupe_key="s", ts=11, latency_seconds=1.0,
+            side="SELL", condition_id="c", token_id="k", outcome="Yes",
+            price=0.55, size=10, usd=5.5, title="M", event_slug="",
+            copied=False, reason="no_position", slug="",
+        )
+        self.store.commit()
+        conn = queries.connect()
+        self.addCleanup(queries.close, conn)
+        page = queries.signals_page(conn, page=1, per_page=20)
+        self.assertAlmostEqual(page["rows"][0]["target_avg_buy"], 0.5)
 
     def test_request_restart_writes_kv(self):
         error = queries.request_restart()

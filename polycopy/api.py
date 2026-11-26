@@ -94,6 +94,36 @@ class ClobApi:
         body = self.http.get_json(CLOB_API + "/markets/" + str(condition_id))
         return body if isinstance(body, dict) else None
 
+    def midpoints(self, token_ids: list[str]) -> dict[str, float]:
+        """Batch midpoint price per token (POST /midpoints, public endpoint).
+
+        Tokens without a book are simply absent from the result.
+        """
+        ids = [str(t) for t in token_ids if t]
+        if not ids:
+            return {}
+        body = self.http.post_json(
+            CLOB_API + "/midpoints", [{"token_id": t} for t in ids])
+        return _price_map(body)
+
+    def last_trade_prices(self, token_ids: list[str]) -> dict[str, float]:
+        """Batch last-traded price per token (POST /last-trades-prices)."""
+        ids = [str(t) for t in token_ids if t]
+        if not ids:
+            return {}
+        body = self.http.post_json(
+            CLOB_API + "/last-trades-prices", [{"token_id": t} for t in ids])
+        return _row_prices(body)
+
+    def current_prices(self, token_ids: list[str]) -> dict[str, float]:
+        """Midpoint where available, last trade as the fallback."""
+        wanted = [str(t) for t in token_ids if t]
+        prices = self.midpoints(wanted)
+        missing = [t for t in wanted if t not in prices]
+        if missing:
+            prices.update(self.last_trade_prices(missing))
+        return prices
+
     def fee_rate(self, token_id: str) -> float | None:
         """Return the market's fee rate, or None.
 
@@ -125,3 +155,41 @@ class GammaApi:
         if isinstance(body, list) and body:
             return body[0]
         return None
+
+
+def _as_price(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if 0.0 <= number <= 1.0 else None
+
+
+def _price_map(body: Any) -> dict[str, float]:
+    """Normalise /midpoints: {token_id: "0.475"} (or a list of rows)."""
+    if isinstance(body, list):
+        return _row_prices(body)
+    if not isinstance(body, dict):
+        return {}
+    out: dict[str, float] = {}
+    for token, value in body.items():
+        price = _as_price(value)
+        if price is not None:
+            out[str(token)] = price
+    return out
+
+
+def _row_prices(body: Any) -> dict[str, float]:
+    """Normalise [{"token_id": ..., "price": "0.48"}, ...]."""
+    rows = body if isinstance(body, list) else (
+        body.get("data") if isinstance(body, dict) else None)
+    out: dict[str, float] = {}
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        token = row.get("token_id") or row.get("tokenId")
+        price = _as_price(row.get("price") if row.get("price") is not None
+                          else row.get("mid"))
+        if token and price is not None:
+            out[str(token)] = price
+    return out

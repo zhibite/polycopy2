@@ -91,6 +91,7 @@
       <thead>
         <tr>
           <th>时间</th><th>方向</th><th>市场</th><th>结果</th><th>信号价</th>
+          <th title="该结果 token 的当前中间价（无盘口时用最近成交价），每 2 秒刷新">当前价</th>
           <th>信号金额</th><th>状态</th><th>跳过原因</th><th>延迟</th>
           <th>我方价格</th><th>我方数量</th><th>我方金额</th>
         </tr>
@@ -109,6 +110,9 @@
             </td>
             <td>{{ s.outcome or '--' }}</td>
             <td class="mono">{{ s.price|price }}</td>
+            <td class="mono live-price" data-token="{{ s.token_id }}"
+                data-entry="{{ s.price if s.side == 'BUY' else (s.target_avg_buy or '') }}"
+                title="当前价为中间价（无盘口时用最近成交价）；盈亏% = 当前价 / 买入价 - 1，买入信号用本笔信号价，卖出信号用跟单地址记录买入均价"><span class="px">--</span><span class="pnl"></span></td>
             <td class="mono">{{ s.usd|money }}</td>
             <td>
               {% if s.copied %}
@@ -124,7 +128,7 @@
             <td class="mono">{{ s.our_notional|money if s.our_notional is not none else '--' }}</td>
           </tr>
         {% else %}
-          <tr><td colspan="12" class="no-data">暂无信号</td></tr>
+          <tr><td colspan="13" class="no-data">暂无信号</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -146,5 +150,54 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+(function () {
+  var cells = Array.prototype.slice.call(
+    document.querySelectorAll('td[data-token]'));
+  if (!cells.length) return;
+  var ids = Array.from(new Set(cells.map(function (c) {
+    return c.dataset.token;
+  })));
+  var busy = false;
+
+  function refresh() {
+    if (busy || document.hidden) return;
+    busy = true;
+    fetch('/api/signals/prices?ids=' + encodeURIComponent(ids.join(',')),
+          {cache: 'no-store'})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (body) {
+        if (!body || !body.prices) return;
+        cells.forEach(function (cell) {
+          var value = body.prices[cell.dataset.token];
+          if (value === null || value === undefined) return;
+          var price = Number(value);
+          var px = cell.querySelector('.px');
+          var pnl = cell.querySelector('.pnl');
+          if (px) px.textContent = price.toFixed(3);
+          if (!pnl) return;
+          var entry = parseFloat(cell.dataset.entry);
+          if (!isFinite(entry) || entry <= 0) {
+            pnl.textContent = '';
+            pnl.className = 'pnl';
+            return;
+          }
+          var pct = (price / entry - 1) * 100;
+          pnl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+          pnl.className = 'pnl ' + (pct >= 0 ? 'green' : 'red');
+        });
+      })
+      .catch(function () {})
+      .then(function () { busy = false; });
+  }
+
+  refresh();
+  setInterval(refresh, 2000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) refresh();
+  });
+})();
+</script>
 
 {% endblock %}

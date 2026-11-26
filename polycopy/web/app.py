@@ -7,7 +7,9 @@ the TOML engine config (the engine hot-reloads it).
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
+import threading
 import time
 import urllib.parse
 from dataclasses import asdict, replace
@@ -20,7 +22,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from ..api import ClobApi
 from ..config import AppConfig, RunConfig, load_config
+from ..http import HttpClient
 from . import auth, config_io, queries
 
 WEB_DIR = Path(__file__).resolve().parent
@@ -34,6 +38,45 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+# Live prices for the signals table: batched CLOB midpoints behind a short
+# TTL. The browser polls every 2s; the TTL keeps one viewer from hammering
+# the API and lets multiple viewers share one fetch.
+_PRICE_TTL_SECONDS = 1.5
+_PRICE_MAX_TOKENS = 200
+_price_lock = threading.Lock()
+_price_cache: dict[str, tuple[float, float]] = {}
+_price_api = ClobApi(HttpClient(
+    timeout=5, retries=1, logger=logging.getLogger("polycopy.web.prices")))
+
+
+def _signal_prices(token_ids: list[str]) -> dict[str, float | None]:
+    """Current midpoint (last-trade fallback) for each token, cached briefly."""
+    now = time.time()
+    out: dict[str, float | None] = {}
+    missing: list[str] = []
+    with _price_lock:
+        for token in token_ids:
+            cached = _price_cache.get(token)
+            if cached and now - cached[1] <= _PRICE_TTL_SECONDS:
+                out[token] = cached[0]
+            else:
+                out[token] = None
+                missing.append(token)
+        if missing:
+            fresh = _price_api.current_prices(missing)
+            for token in missing:
+                price = fresh.get(token)
+                if price is None:
+                    continue
+                _price_cache[token] = (price, now)
+                out[token] = price
+            if len(_price_cache) > 2000:
+                cutoff = now - 300
+                for token, (_, fetched_at) in list(_price_cache.items()):
+                    if fetched_at < cutoff:
+                        _price_cache.pop(token, None)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -722,6 +765,22 @@ def api_signals(request: Request, copied: str = "", reason: str = "", page: int 
         )
     finally:
         queries.close(conn)
+
+
+@app.get("/api/signals/prices")
+def api_signal_prices(request: Request, ids: str = ""):
+    """Current midpoint (last trade fallback) for the visible signal tokens."""
+    _require_api(request)
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for part in ids.split(","):
+        token = part.strip()
+        if token.isdigit() and token not in seen:
+            seen.add(token)
+            tokens.append(token)
+        if len(tokens) >= _PRICE_MAX_TOKENS:
+            break
+    return {"prices": _signal_prices(tokens), "ts": int(time.time())}
 
 
 @app.get("/api/config")
