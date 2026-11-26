@@ -763,6 +763,17 @@ class Engine:
             token = str(pos.get("token_id") or "")
             if not target_addr or not token:
                 continue
+            shares = float(pos.get("shares") or 0.0)
+            if shares <= 1e-12:
+                continue
+            if (self.executor.is_live
+                    and shares < float(self.executor.min_shares)):
+                # A live FAK order below the venue minimum can never fill;
+                # queueing it would create a retry/drop loop every cycle.
+                self.log.debug(
+                    "orphan dust below live minimum: %s sh=%.4f",
+                    token[:16], shares)
+                continue
             if self.store.target_shares(target_addr, token) > 1e-9:
                 continue
             if self.store.pending_exit(target_addr, cond, token):

@@ -239,6 +239,20 @@ class EngineTest(unittest.TestCase):
             store.position("0xabc", "c1", "t1")["shares"], 2.4)
         self.assertEqual(store.recent_fills(1)[0]["note"], "strict_exit")
 
+    def test_orphan_dust_below_live_minimum_is_not_queued(self):
+        engine, store = self.make_engine([])
+        store.apply_buy(
+            ts=int(time.time()), target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Dust",
+            event_slug="", shares=4.0, price=0.5, fee=0.0,
+        )
+        store.commit()
+        engine.executor.is_live = True
+        engine.executor.min_shares = 5.0
+        queued = engine.reconcile_orphan_positions()
+        self.assertEqual(queued, 0)
+        self.assertIsNone(store.pending_exit("0xabc", "c1", "t1"))
+
     def test_target_reconciliation_closes_orphan(self):
         now = int(time.time())
         engine, store = self.make_engine(
