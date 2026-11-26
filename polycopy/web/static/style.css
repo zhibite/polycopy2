@@ -57,7 +57,8 @@ tr:last-child td { border-bottom: none; }
 .mono { font-variant-numeric: tabular-nums; }
 .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-.pill { font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #1e1e3a; color: #a0a0b0; }
+.pill { font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #1e1e3a; color: #a0a0b0; white-space: nowrap; }
+.nowrap { white-space: nowrap; }
 .pill.buy, .pill.ok { background: #064e3b; color: #34d399; }
 .pill.sell { background: #450a0a; color: #f87171; }
 .pill.warn { background: #3a2f10; color: #fbbf24; }

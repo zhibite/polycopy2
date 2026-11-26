@@ -92,14 +92,14 @@
         <tr>
           <th>时间</th><th>方向</th><th>市场</th><th>结果</th><th>信号价</th>
           <th title="该结果 token 的当前中间价（无盘口时用最近成交价），每 2 秒刷新">当前价</th>
-          <th>信号金额</th><th>状态</th><th>跳过原因</th><th>延迟</th>
+          <th>信号金额</th><th>状态</th><th>延迟</th>
           <th>我方价格</th><th>我方数量</th><th>我方金额</th>
         </tr>
       </thead>
       <tbody>
         {% for s in data.rows %}
           <tr>
-            <td class="mono">{{ s.ts|dt_bj }}</td>
+            <td class="mono nowrap">{{ s.ts|dt_bj }}</td>
             <td><span class="pill {{ 'buy' if s.side == 'BUY' else 'sell' }}">{{ '买入' if s.side == 'BUY' else '卖出' }}</span></td>
             <td title="{{ s.title }}">
               {% if s.event_slug or s.slug or s.market_slug %}
@@ -118,17 +118,17 @@
               {% if s.copied %}
                 <span class="pill ok">已跟单</span>
               {% else %}
-                <span class="pill idle">已跳过</span>
+                {% set skip_reason = (s.reason|reason_cn) if s.reason else '未知原因' %}
+                <span class="pill idle" title="{{ skip_reason }}{% if s.reason and skip_reason != s.reason %} · {{ s.reason }}{% endif %}">已跳过</span>
               {% endif %}
             </td>
-            <td class="muted">{{ (s.reason|reason_cn) if not s.copied else '--' }}</td>
             <td class="mono muted">{{ s.latency_seconds|num(1) if s.latency_seconds is not none else '--' }}s</td>
             <td class="mono">{{ s.our_price|price if s.our_price is not none else '--' }}</td>
             <td class="mono">{{ s.our_shares|num(2) if s.our_shares is not none else '--' }}</td>
             <td class="mono">{{ s.our_notional|money if s.our_notional is not none else '--' }}</td>
           </tr>
         {% else %}
-          <tr><td colspan="13" class="no-data">暂无信号</td></tr>
+          <tr><td colspan="12" class="no-data">暂无信号</td></tr>
         {% endfor %}
       </tbody>
     </table>
