@@ -150,6 +150,11 @@ class EngineTest(unittest.TestCase):
                         gamma or FakeGamma())
         return engine, store
 
+    def _live(self, engine):
+        engine.cfg.live.funder = "0xacc"
+        engine.cfg.live.dry_run = False
+        engine.executor.is_live = True
+
     def test_copy_buy_and_proportional_sell(self):
         now = int(time.time())
         rows = [
@@ -277,6 +282,179 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(
             store.position("0xabc", "c1", "t1")["status"], "CLOSED")
         self.assertIsNone(store.pending_exit("0xabc", "c1", "t1"))
+
+    def test_external_sell_closes_position(self):
+        now = int(time.time())
+        engine, store = self.make_engine([])
+        self._live(engine)
+        store.apply_buy(
+            ts=now - 600, target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Test",
+            event_slug="", shares=10.0, price=0.5, fee=0.0,
+        )
+        store.commit()
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [] if user == "0xacc" else None)
+        engine.data.rows = [{
+            "type": "TRADE", "side": "SELL", "token_id": "t1",
+            "condition_id": "c1", "outcome": "Yes", "size": 10.0,
+            "price": 0.6, "usdc_size": 5.94, "timestamp": now - 300,
+        }]
+        self.assertEqual(engine.reconcile_our_positions(), 1)
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertEqual(pos["status"], "CLOSED")
+        self.assertAlmostEqual(store.account()["realized_pnl"], 0.94)
+        fill = store.recent_fills(1)[0]
+        self.assertEqual(fill["kind"], "MANUAL")
+        self.assertEqual(fill["note"], "external website sell")
+
+    def test_external_sell_skips_fresh_position(self):
+        now = int(time.time())
+        engine, store = self.make_engine([])
+        self._live(engine)
+        store.apply_buy(
+            ts=now, target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Test",
+            event_slug="", shares=10.0, price=0.5, fee=0.0,
+        )
+        store.commit()
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [] if user == "0xacc" else None)
+        engine.data.rows = [{
+            "type": "TRADE", "side": "SELL", "token_id": "t1",
+            "condition_id": "c1", "size": 10.0, "price": 0.6,
+            "usdc_size": 5.94, "timestamp": now,
+        }]
+        self.assertEqual(engine.reconcile_our_positions(), 0)
+        self.assertEqual(
+            store.position("0xabc", "c1", "t1")["status"], "OPEN")
+
+    def test_external_sell_skips_token_with_recent_bot_order(self):
+        now = int(time.time())
+        engine, store = self.make_engine([])
+        self._live(engine)
+        store.apply_buy(
+            ts=now - 600, target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Test",
+            event_slug="", shares=10.0, price=0.5, fee=0.0,
+        )
+        store.create_order(
+            dedupe_key="d9", target="0xabc", mode="live", side="SELL",
+            condition_id="c1", token_id="t1", outcome="Yes",
+            limit_price=0.5, size=10.0, status="FILLED", fee_rate=0.01,
+        )
+        store.commit()
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [] if user == "0xacc" else None)
+        engine.data.rows = [{
+            "type": "TRADE", "side": "SELL", "token_id": "t1",
+            "condition_id": "c1", "size": 10.0, "price": 0.6,
+            "usdc_size": 5.94, "timestamp": now - 1,
+        }]
+        self.assertEqual(engine.reconcile_our_positions(), 0)
+        self.assertEqual(
+            store.position("0xabc", "c1", "t1")["status"], "OPEN")
+
+    def test_external_partial_sell_reduces_position(self):
+        now = int(time.time())
+        engine, store = self.make_engine([])
+        self._live(engine)
+        store.apply_buy(
+            ts=now - 600, target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Test",
+            event_slug="", shares=10.0, price=0.5, fee=0.0,
+        )
+        store.commit()
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [
+                {"token_id": "t1", "current_size": 4.0, "title": "Test"},
+            ] if user == "0xacc" else None)
+        engine.data.rows = [{
+            "type": "TRADE", "side": "SELL", "token_id": "t1",
+            "condition_id": "c1", "size": 6.0, "price": 0.6,
+            "usdc_size": 3.54, "timestamp": now - 300,
+        }]
+        self.assertEqual(engine.reconcile_our_positions(), 1)
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertEqual(pos["status"], "OPEN")
+        self.assertAlmostEqual(pos["shares"], 4.0)
+        self.assertAlmostEqual(store.account()["realized_pnl"], 0.54)
+
+    def test_external_close_uses_mark_when_no_activity(self):
+        now = int(time.time())
+        engine, store = self.make_engine([])
+        self._live(engine)
+        store.apply_buy(
+            ts=now - 600, target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Test",
+            event_slug="", shares=10.0, price=0.5, fee=0.0,
+        )
+        store.set_mark("t1", 0.55, 0.60, 0.58, now - 10)
+        store.commit()
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [] if user == "0xacc" else None)
+        engine.data.rows = []
+        self.assertEqual(engine.reconcile_our_positions(), 1)
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertEqual(pos["status"], "CLOSED")
+        self.assertAlmostEqual(store.account()["realized_pnl"], 0.5)
+        self.assertEqual(store.recent_fills(1)[0]["note"],
+                         "external close estimate")
+
+    def test_external_redeem_matches_empty_token_by_condition(self):
+        now = int(time.time())
+        engine, store = self.make_engine([])
+        self._live(engine)
+        store.apply_buy(
+            ts=now - 600, target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Test",
+            event_slug="", shares=10.0, price=0.5, fee=0.0,
+        )
+        store.commit()
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [] if user == "0xacc" else None)
+        engine.data.rows = [{
+            "type": "REDEEM", "token_id": "", "condition_id": "c1",
+            "outcome": "Yes", "size": 10.0, "usdc_size": 0.0,
+            "timestamp": now - 300,
+        }]
+        self.assertEqual(engine.reconcile_our_positions(), 1)
+        pos = store.position("0xabc", "c1", "t1")
+        self.assertEqual(pos["status"], "CLOSED")
+        self.assertAlmostEqual(store.account()["realized_pnl"], -5.0)
+        self.assertEqual(store.recent_fills(1)[0]["note"], "external redeem")
+
+    def test_external_position_is_warned_not_adopted(self):
+        engine, store = self.make_engine([])
+        self._live(engine)
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [
+                {"token_id": "t2", "current_size": 5.0, "title": "Manual buy"},
+            ] if user == "0xacc" else None)
+        engine.data.rows = []
+        with self.assertLogs("polycopy.engine", level="WARNING") as logs:
+            self.assertEqual(engine.reconcile_our_positions(), 0)
+        self.assertTrue(any("EXTERNAL POSITION not in ledger" in line
+                            for line in logs.output))
+        self.assertIsNone(store.position("0xabc", "c2", "t2"))
+
+    def test_external_reconcile_is_skipped_in_paper_mode(self):
+        now = int(time.time())
+        engine, store = self.make_engine([])
+        engine.cfg.live.funder = "0xacc"
+        engine.cfg.live.dry_run = False
+        store.apply_buy(
+            ts=now - 600, target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Test",
+            event_slug="", shares=10.0, price=0.5, fee=0.0,
+        )
+        store.commit()
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [] if user == "0xacc" else None)
+        engine.data.rows = []
+        self.assertEqual(engine.reconcile_our_positions(), 0)
+        self.assertEqual(
+            store.position("0xabc", "c1", "t1")["status"], "OPEN")
 
     def test_manual_sell_offsets_future_target_sells_and_fully_exits(self):
         now = int(time.time())

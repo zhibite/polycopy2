@@ -12,6 +12,11 @@ from .config import AppConfig, TargetConfig, load_config
 from .execution import Executor, PaperExecutor, TradeIntent
 from .store import Store
 
+# External-position reconciliation (website trades on the live account).
+POSITION_RECONCILE_SECONDS = 60
+POSITION_RECONCILE_MIN_AGE = 180   # don't race the bot's own fresh fills
+POSITION_RECONCILE_DUST = 0.001    # data-api rounds sizes to 4 decimals
+
 
 class Engine:
     def __init__(self, cfg: AppConfig, store: Store, data_api: DataApi,
@@ -29,7 +34,9 @@ class Engine:
         self._last_settle = 0
         self._last_mark = 0
         self._last_target_reconcile = 0
+        self._last_position_reconcile = 0
         self._last_balance_sync = 0
+        self._external_warned: dict[str, float] = {}
         self._market_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._token_cache: dict[str, tuple[float, list[str]]] = {}
         self._cycles = 0
@@ -92,6 +99,15 @@ class Engine:
                 self._last_target_reconcile = now
             except Exception:
                 self.log.exception("target position reconciliation failed")
+        if (self.executor.is_live and not self.cfg.live.dry_run
+                and self.cfg.live.funder
+                and now - self._last_position_reconcile
+                >= POSITION_RECONCILE_SECONDS):
+            try:
+                self.reconcile_our_positions()
+                self._last_position_reconcile = now
+            except Exception:
+                self.log.exception("external position reconciliation failed")
         try:
             self.reconcile_orphan_positions()
         except Exception:
@@ -752,6 +768,187 @@ class Engine:
                 "TARGET LEDGER %-8s positions=%d", name, len(positions))
         self.store.commit()
         return total
+
+    # -------------------------------------------- external account reconcile
+    def reconcile_our_positions(self) -> int:
+        """Close/reduce positions that were sold outside the bot.
+
+        Compares our OPEN ledger with the funder's on-chain positions.  A
+        position is only touched when it has been idle for
+        POSITION_RECONCILE_MIN_AGE, so the data-api lag cannot race a fill the
+        bot just made.  External sells/redeems are priced from the account's
+        own activity; without activity the last bid/mid is used and the close
+        is marked as an estimate.  Extra on-chain shares (manual buys) are
+        warned about, never adopted.
+        """
+        if not self.executor.is_live or self.cfg.live.dry_run:
+            return 0
+        funder = str(self.cfg.live.funder or "")
+        if not funder:
+            return 0
+        chain = self.data.open_positions(funder, limit=500, max_pages=10)
+        if chain is None:
+            self.log.warning("external reconcile: account positions unavailable")
+            return 0
+        chain_sizes: dict[str, float] = {}
+        chain_titles: dict[str, str] = {}
+        for row in chain:
+            token = str(row.get("token_id") or "")
+            if not token:
+                continue
+            size = rules.to_float(row.get("current_size"))
+            if size <= 1e-12:
+                continue
+            chain_sizes[token] = chain_sizes.get(token, 0.0) + size
+            chain_titles[token] = str(row.get("title") or "")
+
+        now = int(time.time())
+        positions = self.store.open_positions(limit=10_000)
+        db_tokens = {str(p.get("token_id") or "") for p in positions}
+        order_guard = now - POSITION_RECONCILE_MIN_AGE
+        for token, size in chain_sizes.items():
+            if token not in db_tokens:
+                if self.store.has_recent_order(token, order_guard):
+                    continue
+                self._warn_external(token, chain_titles.get(token, ""),
+                                    "unknown", size)
+
+        mismatched: list[tuple[dict[str, Any], float]] = []
+        for pos in positions:
+            token = str(pos.get("token_id") or "")
+            held = float(pos.get("shares") or 0.0)
+            onchain = chain_sizes.get(token, 0.0)
+            if onchain > held + POSITION_RECONCILE_DUST:
+                if not self.store.has_recent_order(token, order_guard):
+                    self._warn_external(token, str(pos.get("title") or ""),
+                                        "extra", onchain - held)
+                continue
+            missing = held - onchain
+            if missing <= POSITION_RECONCILE_DUST:
+                continue
+            if self.store.has_recent_order(token, order_guard):
+                continue
+            if now - int(pos.get("updated_at") or 0) < POSITION_RECONCILE_MIN_AGE:
+                continue
+            mismatched.append((pos, missing))
+        if not mismatched:
+            self.log.debug(
+                "external reconcile: %d on-chain positions, ledger matched",
+                len(chain_sizes))
+            return 0
+
+        start_ts = min(int(p.get("updated_at") or 0) for p, _ in mismatched)
+        activity = self.data.activity(funder, start_ts, limit=500, max_pages=3)
+        if not isinstance(activity, list):
+            activity = []
+
+        closed = 0
+        for pos, missing in mismatched:
+            token = str(pos.get("token_id") or "")
+            remaining = missing
+            for shares, price, net, note in self._external_exits(activity, pos):
+                if remaining <= 1e-9:
+                    break
+                use = min(remaining, shares)
+                if use <= 1e-9:
+                    continue
+                use_net = net * (use / shares) if shares > 0 else 0.0
+                fee = max(0.0, use * price - use_net)
+                result = self.store.apply_sell(
+                    ts=now, target=pos["target"], signal_id=None,
+                    condition_id=pos["condition_id"], token_id=token,
+                    outcome=str(pos.get("outcome") or ""), shares=use,
+                    price=price, fee=fee, manual=True, kind="MANUAL",
+                    note=note,
+                )
+                if result:
+                    remaining -= use
+                    closed += 1
+                    self.log.warning(
+                        "EXTERNAL CLOSE %-8s sh=%.4f px=%.4f %s %s",
+                        str(pos.get("target") or "")[:10], use, price, note,
+                        str(pos.get("title") or "")[:50],
+                    )
+            if remaining > 1e-9:
+                mark = self.store.mark(token) or {}
+                price = (rules.to_float(mark.get("bid"))
+                         or rules.to_float(mark.get("mid"))
+                         or float(pos.get("avg_cost") or 0.0))
+                result = self.store.apply_sell(
+                    ts=now, target=pos["target"], signal_id=None,
+                    condition_id=pos["condition_id"], token_id=token,
+                    outcome=str(pos.get("outcome") or ""), shares=remaining,
+                    price=price, fee=0.0, manual=True, kind="MANUAL",
+                    note="external close estimate",
+                )
+                if result:
+                    closed += 1
+                    self.log.warning(
+                        "EXTERNAL CLOSE ESTIMATE %-8s sh=%.4f px=%.4f "
+                        "no activity found %s",
+                        str(pos.get("target") or "")[:10], remaining, price,
+                        str(pos.get("title") or "")[:50],
+                    )
+        if closed:
+            self.store.commit()
+            try:
+                self._sync_live_balance()
+            except Exception:
+                self.log.exception("balance sync after external close failed")
+        return closed
+
+    @staticmethod
+    def _external_exits(
+            activity: list[dict[str, Any]], pos: dict[str, Any],
+    ) -> list[tuple[float, float, float, str]]:
+        """Return (shares, price, net, note) for a position's external exits."""
+        token = str(pos.get("token_id") or "")
+        condition = str(pos.get("condition_id") or "")
+        outcome = str(pos.get("outcome") or "")
+        updated_at = int(pos.get("updated_at") or 0)
+        out: list[tuple[float, float, float, str]] = []
+        for row in activity:
+            if int(row.get("timestamp") or 0) <= updated_at:
+                continue
+            row_token = str(row.get("token_id") or "")
+            if row_token:
+                if row_token != token:
+                    continue
+            elif (str(row.get("condition_id") or "") != condition
+                  or (row.get("outcome")
+                      and str(row.get("outcome")) != outcome)):
+                continue
+            kind = str(row.get("type") or "").upper()
+            shares = rules.to_float(row.get("size"))
+            if shares <= 1e-9:
+                continue
+            net = rules.to_float(row.get("usdc_size"))
+            if kind == "REDEEM":
+                out.append((shares, net / shares, net, "external redeem"))
+            elif kind == "TRADE" and str(row.get("side") or "").upper() == "SELL":
+                price = rules.to_float(row.get("price"))
+                gross = shares * price
+                net = min(net, gross) if net > 0 else gross
+                out.append((shares, price, net, "external website sell"))
+        return out
+
+    def _warn_external(self, token: str, title: str, kind: str,
+                       extra: float) -> None:
+        now = int(time.time())
+        last = self._external_warned.get(token)
+        if last and now - last < 3600:
+            return
+        self._external_warned[token] = now
+        if kind == "unknown":
+            self.log.warning(
+                "EXTERNAL POSITION not in ledger sh=%.4f %s",
+                extra, title[:60],
+            )
+        else:
+            self.log.warning(
+                "EXTERNAL ADD not adopted %s sh=+%.4f %s",
+                token[:16], extra, title[:60],
+            )
 
     def reconcile_orphan_positions(self) -> int:
         """Queue a full strict exit when the target is flat but we still hold."""

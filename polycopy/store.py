@@ -643,6 +643,19 @@ class Store:
         rows = self.conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
 
+    def has_recent_order(self, token_id: str, since_ts: int) -> bool:
+        """True when the bot created an order for this token since since_ts.
+
+        Used by external-position reconciliation so a bot order that is
+        between on-chain fill and local apply is never mistaken for a
+        website sell.
+        """
+        row = self.conn.execute(
+            "SELECT 1 FROM orders WHERE token_id = ? AND created_at >= ? LIMIT 1",
+            (token_id, int(since_ts)),
+        ).fetchone()
+        return bool(row)
+
     def update_order(self, order_id: int, *, status: str | None = None,
                      filled_size: float | None = None,
                      avg_price: float | None = None,
@@ -932,6 +945,13 @@ class Store:
             " bid = excluded.bid, ask = excluded.ask, mid = excluded.mid",
             (token_id, ts, bid, ask, mid),
         )
+
+    def mark(self, token_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT bid, ask, mid, ts FROM marks WHERE token_id = ?",
+            (token_id,),
+        ).fetchone()
+        return dict(row) if row else None
 
     # --------------------------------------------------------------- reporting
     def signal_summary(self) -> list[dict[str, Any]]:
