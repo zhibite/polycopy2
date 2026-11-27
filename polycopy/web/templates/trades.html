@@ -19,6 +19,7 @@
       <option value="" {{ 'selected' if filters.fill_type == '' else '' }}>全部</option>
       <option value="copy_buy" {{ 'selected' if filters.fill_type == 'copy_buy' else '' }}>跟单买入</option>
       <option value="copy_sell" {{ 'selected' if filters.fill_type == 'copy_sell' else '' }}>跟单卖出</option>
+      <option value="manual_buy" {{ 'selected' if filters.fill_type == 'manual_buy' else '' }}>手动买入</option>
       <option value="manual_sell" {{ 'selected' if filters.fill_type == 'manual_sell' else '' }}>手动卖出</option>
     </select>
   </label>
@@ -80,7 +81,9 @@
           <tr>
             <td class="mono">{{ f.ts|dt_bj }}</td>
             <td>
-              {% if f.kind == 'MANUAL' %}
+              {% if f.kind == 'MANUAL' and f.side == 'BUY' %}
+                <span class="pill buy">手动买入</span>
+              {% elif f.kind == 'MANUAL' %}
                 <span class="pill warn">手动卖出</span>
               {% elif f.side == 'BUY' %}
                 <span class="pill buy">跟单买入</span>

@@ -359,7 +359,9 @@ def fills_page(conn: sqlite3.Connection | None, *, side: str = "",
         where.append("f.side = ?")
         params.append(side)
     if fill_type == "manual_sell":
-        where.append("f.kind = 'MANUAL'")
+        where.append("f.kind = 'MANUAL' AND f.side = 'SELL'")
+    elif fill_type == "manual_buy":
+        where.append("f.kind = 'MANUAL' AND f.side = 'BUY'")
     elif fill_type == "copy_buy":
         where.append("f.kind != 'MANUAL' AND f.side = 'BUY'")
     elif fill_type == "copy_sell":

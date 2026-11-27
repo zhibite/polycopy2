@@ -772,7 +772,8 @@ class Store:
                   condition_id: str, token_id: str, outcome: str, title: str,
                   event_slug: str, shares: float, price: float,
                   fee: float, order_id: int | None = None,
-                  slug: str = "") -> None:
+                  slug: str = "", kind: str = "COPY",
+                  note: str | None = None) -> None:
         if shares <= 0:
             return
         notional = shares * price
@@ -818,10 +819,10 @@ class Store:
             )
         self.conn.execute(
             "INSERT INTO fills(ts, target, signal_id, order_id, condition_id,"
-            " token_id, outcome, side, shares, price, notional, fee, kind)"
-            " VALUES (?,?,?,?,?,?,?,'BUY',?,?,?,?,'COPY')",
+            " token_id, outcome, side, shares, price, notional, fee, kind, note)"
+            " VALUES (?,?,?,?,?,?,?,'BUY',?,?,?,?,?,?)",
             (ts, target, signal_id, order_id, condition_id, token_id, outcome,
-             shares, price, notional, fee),
+             shares, price, notional, fee, kind, note),
         )
 
     def apply_sell(self, *, ts: int, target: str, signal_id: int | None,

@@ -129,14 +129,23 @@ class WebQueriesTest(unittest.TestCase):
             token_id="k", outcome="Yes", shares=2, price=0.6, fee=0.0,
             manual=True, kind="MANUAL",
         )
+        self.store.apply_buy(
+            ts=1002, target="t", signal_id=None, condition_id="c2",
+            token_id="k2", outcome="Yes", title="M2", event_slug="",
+            shares=5, price=0.2, fee=0.0, kind="MANUAL", note="external",
+        )
         self.store.commit()
         conn = queries.connect()
         self.addCleanup(queries.close, conn)
         self.assertEqual(queries.fills_page(conn, fill_type="copy_buy")["total"], 1)
         self.assertEqual(queries.fills_page(conn, fill_type="copy_sell")["total"], 0)
         self.assertEqual(queries.fills_page(conn, fill_type="manual_sell")["total"], 1)
+        self.assertEqual(queries.fills_page(conn, fill_type="manual_buy")["total"], 1)
         manual = queries.fills_page(conn, fill_type="manual_sell")["rows"][0]
         self.assertEqual(manual["kind"], "MANUAL")
+        manual_buy = queries.fills_page(conn, fill_type="manual_buy")["rows"][0]
+        self.assertEqual(manual_buy["side"], "BUY")
+        self.assertEqual(manual_buy["note"], "external")
 
     def test_signal_summary(self):
         self.store.record_signal(
