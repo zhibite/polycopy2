@@ -73,7 +73,9 @@
       <thead>
         <tr>
           <th>时间</th><th>类型</th><th>市场</th><th>结果</th>
-          <th>价格</th><th>数量</th><th>金额</th><th>手续费</th><th>已实现盈亏</th>
+          <th>价格</th><th>数量</th><th>金额</th><th>手续费</th>
+          <th title="买入=本次花费（含费）；卖出=卖出份额对应的买入成本">买入成本</th>
+          <th>已实现盈亏</th>
         </tr>
       </thead>
       <tbody>
@@ -103,12 +105,13 @@
             <td class="mono">{{ f.shares|num(2) }}</td>
             <td class="mono">{{ f.notional|money }}</td>
             <td class="mono muted">{{ f.fee|num(4) }}</td>
+            <td class="mono">{{ f.cost_basis|money }}</td>
             <td class="mono {{ 'green' if (f.realized_pnl or 0) >= 0 else 'red' }}">
               {{ (f.realized_pnl|signed_money) if f.side == 'SELL' else '--' }}
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="9" class="no-data">暂无符合条件的成交</td></tr>
+          <tr><td colspan="10" class="no-data">暂无符合条件的成交</td></tr>
         {% endfor %}
       </tbody>
     </table>

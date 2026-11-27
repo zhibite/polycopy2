@@ -64,6 +64,21 @@ class WebQueriesTest(unittest.TestCase):
         self.assertEqual(positions["rows"][0]["title"], "M")
         self.assertEqual(positions["status"], "open")
 
+    def test_fills_include_cost_basis(self):
+        self._buy()  # 10 @ 0.50 + 0.01 fee -> avg cost 0.501
+        self.store.apply_sell(
+            ts=1001, target="t", signal_id=None, condition_id="c",
+            token_id="k", outcome="Yes", shares=2, price=0.6, fee=0.0,
+            manual=True, kind="MANUAL",
+        )
+        self.store.commit()
+        conn = queries.connect()
+        self.addCleanup(queries.close, conn)
+        rows = queries.fills_page(conn, page=1)["rows"]
+        by_side = {row["side"]: row for row in rows}
+        self.assertAlmostEqual(by_side["BUY"]["cost_basis"], 5.01)
+        self.assertAlmostEqual(by_side["SELL"]["cost_basis"], 1.002)
+
     def test_queue_manual_sell(self):
         self._buy()
         self.store.commit()

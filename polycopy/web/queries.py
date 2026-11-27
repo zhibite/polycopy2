@@ -382,7 +382,10 @@ def fills_page(conn: sqlite3.Connection | None, *, side: str = "",
     rows = _all(
         conn,
         "SELECT f.*, p.title AS title, p.event_slug AS event_slug,"
-        " p.slug AS market_slug"
+        " p.slug AS market_slug,"
+        " CASE WHEN f.side = 'SELL'"
+        "      THEN f.notional - f.fee - COALESCE(f.realized_pnl, 0)"
+        "      ELSE f.notional + f.fee END AS cost_basis"
         " FROM fills f LEFT JOIN positions p ON p.target = f.target"
         " AND p.condition_id = f.condition_id AND p.token_id = f.token_id"
         + clause + " ORDER BY f.ts DESC, f.id DESC LIMIT ? OFFSET ?",
