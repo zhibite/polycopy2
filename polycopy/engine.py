@@ -15,7 +15,8 @@ from .store import Store
 # External-position reconciliation (website trades on the live account).
 POSITION_RECONCILE_SECONDS = 60
 POSITION_RECONCILE_MIN_AGE = 180   # don't race the bot's own fresh fills
-POSITION_RECONCILE_DUST = 0.001    # data-api rounds sizes to 4 decimals
+POSITION_RECONCILE_DUST = 0.001    # data-api rounds position sizes to 4 dp
+POSITION_RECONCILE_EXIT_DUST = 0.02  # data-api rounds trade sizes to 2 dp
 
 
 class Engine:
@@ -850,6 +851,11 @@ class Engine:
                 if remaining <= 1e-9:
                     break
                 use = min(remaining, shares)
+                if remaining - use <= POSITION_RECONCILE_EXIT_DUST:
+                    # Activity sizes are rounded to 2 decimals.  Let this
+                    # exit absorb the rounding remainder instead of emitting
+                    # a separate 0.00-share estimate row.
+                    use = remaining
                 if use <= 1e-9:
                     continue
                 use_net = net * (use / shares) if shares > 0 else 0.0

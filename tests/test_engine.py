@@ -308,6 +308,31 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(fill["kind"], "MANUAL")
         self.assertEqual(fill["note"], "external website sell")
 
+    def test_external_rounding_dust_is_merged_into_the_sell(self):
+        now = int(time.time())
+        engine, store = self.make_engine([])
+        self._live(engine)
+        store.apply_buy(
+            ts=now - 600, target="0xabc", signal_id=None,
+            condition_id="c1", token_id="t1", outcome="Yes", title="Test",
+            event_slug="", shares=10.004, price=0.5, fee=0.0,
+        )
+        store.commit()
+        engine.data.open_positions = (
+            lambda user, limit=500, max_pages=10: [] if user == "0xacc" else None)
+        engine.data.rows = [{
+            "type": "TRADE", "side": "SELL", "token_id": "t1",
+            "condition_id": "c1", "size": 10.0, "price": 0.6,
+            "usdc_size": 5.94, "timestamp": now - 300,
+        }]
+        self.assertEqual(engine.reconcile_our_positions(), 1)
+        self.assertEqual(
+            store.position("0xabc", "c1", "t1")["status"], "CLOSED")
+        sells = [f for f in store.recent_fills(10) if f["side"] == "SELL"]
+        self.assertEqual(len(sells), 1)
+        self.assertAlmostEqual(sells[0]["shares"], 10.004)
+        self.assertNotEqual(sells[0]["note"], "external close estimate")
+
     def test_external_sell_skips_fresh_position(self):
         now = int(time.time())
         engine, store = self.make_engine([])
